@@ -1,17 +1,17 @@
 //require modules
-//var es5shim = require('es5-shim');
-//var es6shim = require('es6-shim');
-//var es7shim = require('es7-shim');
-require("babel-polyfill");
-var babel=require("babel-core");
+var es5shim = require('es5-shim');
+var es6shim = require('es6-shim');
+var es7shim = require('es7-shim');
+//require("babel-polyfill");
+var babel = require("babel-core");
 
 
 var net = require('net');
 var util = require('util');
 var vm = require('vm');
 var extend = require('extend');
-var lib = require('../lib/functions');
-var google = require('../google/api');
+var lib = require('./lib/functions');
+var google = require('./lib/google');
 //repl context module
 var REPLContext = require('./context');
 

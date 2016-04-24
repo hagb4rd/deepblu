@@ -1,5 +1,5 @@
 //require("babel-polyfill");
-/*
+//*
 var es5shim = require('es5-shim');
 var es6shim = require('es6-shim');
 var es7shim = require('es7-shim');
@@ -126,20 +126,21 @@ module.exports = function REPLContext(repl) {
     context.Promise = require('bluebird');
     context.request = require('request-promise');
 
-    context.gist = require("../lib/gist");
-    context.lib = require('../lib/functions');
+    context.gist = require("./lib/gist");
+    context.lib = require('./lib/functions');
     context.db = {};
     context.db.user = new(require('dirty'))('user.db');
     context.db.doc = new(require('dirty'))('doc.db');
     context.db.code = new(require('dirty'))('io.db');
     context.db.git = new(require('dirty'))('git.db');
-    context.gist = require('../lib/gist');
-    context.bitly = require('../lib/bitly');
-    context.google = require('../google/api');
+    context.gist = require('./lib/gist');
+    context.bitly = require('./lib/bitly');
+    context.google = require('./lib/google');
     var googleImages = require('google-images');
     context.google.images = googleImages(process.env['GOOGLE_CSE_ALL_ID'], process.env['GOOGLE_APIKEY']);
-    context.google.search = require('../lib/googlesearch').googlesearch;
-    context.google.lucky = require('../lib/googlesearch').lucky;
+    context.google.search = require('./lib/googlesearch').googlesearch;
+    context.google.lucky = require('./lib/googlesearch').lucky;
+    context.babel = require('babel-core');
     context.babelify = function(code, options) {
         options || {};
         return babel.transform(code, options).code;
