@@ -1,7 +1,7 @@
 //require modules
-var es5shim = require('es5-shim');
-var es6shim = require('es6-shim');
-var es7shim = require('es7-shim');
+require('es5-shim');
+require('es6-shim');
+require('es7-shim');
 //require("babel-polyfill");
 var babel = require("babel-core");
 

@@ -8,14 +8,15 @@ var net = require('net');
 var extend = require('extend');
 
 var config = {
-    host: "irc.freenode.org", 
-    port: 6667,
-    nick: "deepblu",
-    user: "earendel",
-    authorize: ['~earendel@unaffiliated/earendel'],
-    trigger: ["-->", this.nick+":",".>"],
-    channel: ['##ge','#esoteric','#javascript'],
-    unrestricted: true
+    host: process.env['DEEPBLU_IRC_HOST'] || "irc.freenode.net", 
+    port: process.env['DEEPBLU_IRC_PORT'] || 6667,
+    nick: process.env['DEEPBLU_IRC_NICK'] || "deepblu",
+    user: process.env['DEEPBLU_IRC_USER'] || "",
+    authorize: [(process.env['DEEPBLU_IRC_AUTHORIZE'] || "")],
+    trigger: [(process.env['DEEPBLU_IRC_TRIGGER'] || "-->"), this.nick+":"],
+    channel: (process.env['DEEPBLU_IRC_CHANNEL']).split(','),
+    unrestricted: (process.env['DEEPBLU_IRC_UNRESTRICTED'] === "true") || true
+    // DEEPBLU_IRC_PASS
 }
 
 //Here's a slightly more complex example of a PONG plugin responding to PING messages:
@@ -86,7 +87,7 @@ Bot.prototype=config;
 Bot.create = function(nick,user,pass,host,port) {
     nick = nick || config.nick;
     user = user || config.user;
-    pass = pass || process.env['ircbot_client_pass'];
+    pass = pass || process.env['DEEPBLU_IRC_PASS'];
     host = host || config.host;
     port = port || config.port;
     return new Bot(nick, user, pass, host, port);

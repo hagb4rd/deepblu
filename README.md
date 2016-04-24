@@ -1,2 +1,14 @@
-"# deepblu" 
-"# deepblue" 
+# deepblu
+
+###ENVIRONMENT VARIABLES
+´´´
+SET DEEPBLU_IRC_AUTHORIZE=~account@hostmask
+SET DEEPBLU_IRC_CHANNEL=#channel1,#channel2
+SET DEEPBLU_IRC_HOST=irc.freenode.net
+SET DEEPBLU_IRC_NICK=myservicebot
+SET DEEPBLU_IRC_PASS=
+SET DEEPBLU_IRC_PORT=6667
+SET DEEPBLU_IRC_TRIGGER=-->
+SET DEEPBLU_IRC_UNRESTRICTED=true
+SET DEEPBLU_IRC_USER=myservicebot
+´´´

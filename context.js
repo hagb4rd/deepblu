@@ -1,9 +1,9 @@
 //require("babel-polyfill");
 //*
-var es5shim = require('es5-shim');
-var es6shim = require('es6-shim');
-var es7shim = require('es7-shim');
-*/
+es5shim = require('es5-shim');
+es6shim = require('es6-shim');
+es7shim = require('es7-shim');
+/* */
 var babel = require("babel-core");
 var net = require('net');
 var util = require('util');
@@ -37,7 +37,7 @@ var evalJS = function(context, transpile) {
                         var part2=next.msg.from +": "+sendMsg.slice(IRCBOT_SPLIT_LINE,IRCBOT_MAX_CHARS);
                         irc.send(next.msg.to, part1);
                         if(sendMsg.length > IRCBOT_MAX_CHARS) {
-                            gist(next.text, Date.now() + " " + next.msg.to, msg.from +": "+msg.command).then(function(link) {
+                            gist(next.text, (new Date).toISOString() + " " + next.msg.to, msg.from +": "+msg.command).then(function(link) {
                                 part2 = part2 + " [..] read more: " + link;
                                 irc.send(next.msg.to, part2);
                             });
@@ -151,7 +151,7 @@ module.exports = function REPLContext(repl) {
     bot.channel.forEach(chan=>bot.client.join(chan));
     //context.bot = bot.client;
     context.su = (function() {
-        var password = process.env['ircbot_client_pass'];
+        var password = process.env['DEEPBLU_IRC_PASS'];
         return function(pass) {
             if(pass===password) {
                 return {
