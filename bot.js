@@ -1,17 +1,24 @@
-var es5 = require('es5-shim');
-var es6 = require('es6-shim');
-var es7 = require('es7-shim');
+require('es5-shim');
+require('es6-shim');
+require('es7-shim');
 var Promise = require('bluebird');
 var promisify = require('./lib/promisify');
 var irc = require('slate-irc');
 var net = require('net');
 var extend = require('extend');
+var tls = require('tls');
+var fs = require('fs');
+var util = require('util');
+
+
 
 var config = {
     host: process.env['DEEPBLU_IRC_HOST'] || "irc.freenode.net", 
     port: process.env['DEEPBLU_IRC_PORT'] || 6667,
-    nick: process.env['DEEPBLU_IRC_NICK'] || "deepblu",
+    nick: process.env['DEEPBLU_IRC_NICK'] || "deepblu12",
     user: process.env['DEEPBLU_IRC_USER'] || "",
+    pfxFile: process.env['DEEPBLU_IRC_PFX_FILEPATH'],
+    pfxPass: process.env['DEEPBLU_IRC_PFX_PASS'],
     authorize: [(process.env['DEEPBLU_IRC_AUTHORIZE'] || "")],
     trigger: [(process.env['DEEPBLU_IRC_TRIGGER'] || "-->"), this.nick+":"],
     channel: (process.env['DEEPBLU_IRC_CHANNEL']).split(','),
@@ -71,7 +78,24 @@ function Bot(nick, user, pass, host, port) {
         self.host = host;
     if(port)
         self.port = port;
-    self.stream = net.connect({port: self.port, host: self.host});
+        
+    //Secure Socket?
+    if(self.pfxFile && self.pfxPass) {
+        console.log('SECURE CONNECTION..')
+        var tlsOptions = {
+           pfx: fs.readFileSync(self.pfxFile),
+           passphrase: self.pfxPass,
+           host: self.host,
+           port: self.port
+        };
+        self.stream = tls.connect(tlsOptions, ()=>{
+            console.log('Socket conntected', util.inspect(self.stream, {showHidden: false, depth: 0, colors: true}));
+        })
+    } else {
+        self.stream = net.connect({port: self.port, host: self.host});    
+    };
+    
+    
     self.client = promisify(irc(self.stream));    
     self.client.pass(pass);
     self.client.nick(self.nick);
