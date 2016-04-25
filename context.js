@@ -105,6 +105,11 @@ var evalJS = function(context, transpile) {
             } catch(e) {
                 cx.console.log(e);
             }
+            //Catch uncaught errors
+            process.on('uncaught', function(e) {
+                cx.console.log(e);
+                console.log(util.inspect(e,{showHidden: true, depth:null, color: true}));
+            });
             
         });
     }
@@ -257,7 +262,4 @@ module.exports = function REPLContext(repl) {
     
 };
 
-//Catch uncaught errors
-process.on('uncaught', function(e) {
-    console.log(util.inspect(e,{showHidden: true, depth:null, color: true}));;
-});
+
