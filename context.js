@@ -1,8 +1,8 @@
 //require("babel-polyfill");
 //*
-es5shim = require('es5-shim');
-es6shim = require('es6-shim');
-es7shim = require('es7-shim');
+require('es5-shim');
+require('es6-shim');
+require('es7-shim');
 /* */
 var babel = require("babel-core");
 var net = require('net');
