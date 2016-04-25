@@ -40,7 +40,7 @@ Help on generating [OpenSSL](https://nodejs.org/api/tls.html#tls_tls_ssl) keys, 
 ######DEEPBLU_IRC_PFX_PASS
 Passphrase for PFX file.
 
-######SET DEEPBLU_IRC_CHANNEL
+######DEEPBLU_IRC_CHANNEL
 Channel list to join on connect (separate by coma, no whitespace)
 
 ######DEEPBLU_IRC_USER
