@@ -24,11 +24,14 @@ var TIMEOUT = 12;
 
 // START REPL
 // ==========
-var repl = require('repl').start({
+var repl, terminal, replServer;
+
+replServer = net.createServer(function(socket) {
+    repl = require('repl').start({
     prompt: "> ", //the prompt and stream for all I/O. Defaults to > .
-    input: process.stdin, // - the readable stream to listen to. Defaults to process.stdin.
-    output: process.stdout, //- the writable stream to write readline data to. Defaults to process.stdout.
-    terminal: false, // - pass true if the stream should be treated like a TTY, and have ANSI/VT100 escape codes written to it. Defaults to checking isTTY on the output stream upon instantiation.
+    input: socket, // - the readable stream to listen to. Defaults to process.stdin.
+    output: socket, //- the writable stream to write readline data to. Defaults to process.stdout.
+    terminal: true, // - pass true if the stream should be treated like a TTY, and have ANSI/VT100 escape codes written to it. Defaults to checking isTTY on the output stream upon instantiation.
     //eval: run, //- function that will be used to eval each given line. Defaults to an async wrapper for eval(). See below for an example of a custom eval.
     useColors: false, // - a boolean which specifies whether or not the writer function should output colors. If a different writer function is set then this does nothing. Defaults to the repl's terminal value.
     useGlobal: false, // - if set to true, then the repl will use the global object, instead of running scripts in a separate context. Defaults to false.
@@ -48,121 +51,124 @@ var repl = require('repl').start({
     }
         /* */
         //replMode: magic
-});
-repl.context = new REPLContext(repl);
+    });
+    repl.context = new REPLContext(repl);
 
-//.clear RESET context 
-repl.on('reset', (context) => {
-    console.log('repl has a new context');
-    return new REPLContext(repl);
-});
+    //.clear RESET context 
+    repl.on('reset', (context) => {
+        console.log('repl has a new context');
+        return new REPLContext(repl);
+    });
 
-//ready.
-repl.displayPrompt();
+    //ready.
+    repl.displayPrompt();
+    
+    
+    // REPL DEFINE COMMANDS
+    // =====================
 
+    //googleQueryFunctor
 
-// REPL DEFINE COMMANDS
-// =====================
+    /**
+     * (description)
+     * 
+     * @param queryAdd ()
+     * @returns (description)
+     */
+    function googleQuery(queryAdd) {
+        if(queryAdd)
+            queryAdd = " " + queryAdd;
+        else 
+            queryAdd = "";
+            
+        return function(query) {
+            repl.context.lucky(query + queryAdd).then(x => {
 
-//googleQueryFunctor
-
-/**
- * (description)
- * 
- * @param queryAdd ()
- * @returns (description)
- */
-function googleQuery(queryAdd) {
-    if(queryAdd)
-        queryAdd = " " + queryAdd;
-    else 
-        queryAdd = "";
-        
-    return function(query) {
-        repl.context.lucky(query + queryAdd).then(x => {
-
-            //console.log(x);
-            repl.write(x + "\r\n");
-            repl.displayPrompt();
-        });
-    }
-}
-
-repl.defineCommand('g', {
-    help: 'repl.context.lucky Google Search',
-    action: googleQuery()
-});
-
-repl.defineCommand('gif', {
-    help: 'gif image search -> ',
-    action: function(query) {
-        google.gif.search(query).then(function(result) {
-            repl.context.stack = repl.context.stack || []; 
-            repl.context.stack.push(result);
-            var shortResult = result.items.map(item=>'< ' + item.link.toString() + ' > ' + item.title.toString());
-            var is = result.items.map(item=>item.link);
-            repl.context.images = repl.context.images || [];
-            repl.context.images = repl.context.images.concat(is);
-            console.log(shortResult.join(' | ') + ' --> images.random() //try\r\n');
-            repl.displayPrompt();          
-        })
-        
-    }
-})
-
-repl.defineCommand('mdn', {
-    help: 'Search Mozilla Development Network',
-    action: googleQuery("javascript site:developer.mozilla.org")
-});
-repl.defineCommand('yt', {
-    help: 'youtube search',
-    action: function(query) {
-        repl.context.googlesearch(query + " site:youtube.com").then(list => {
-            repl.context.stack.push(list);
-            var i = 0;
-            while (i++ < 3)
-                format.youtube(list[i]);
-            repl.displayPrompt();
-        });
-    }
-});
-repl.defineCommand('learn', {
-    help: 'learn <command> { help: "helptext", action: function(query) { repl.displayPrompt(); } }',
-    action: function(query) {
-
-        var split = query.split(' ');
-        var command = split.shift();
-        var commandObject = eval(split.join(' '));
-        if (commandObject.help && commandObject.action) {
-            try {
-                repl.defineCommand(command, {
-                    help: commandObject.help,
-                    action: function(q) {
-                        commandObject.action(q);
-                        repl.displayPrompt();
-                    }
-                });
-                console.log('NEW COMMAND:\n\n' + commandObject.help);
-            } catch (e) {
-                console.log('ERROR: learn command failed. USAGE:\n' + this.help);
-            }
-
+                //console.log(x);
+                repl.write(x + "\r\n");
+                repl.displayPrompt();
+            });
         }
     }
-});
 
-//FORMAT console
-//---------------
-var format = {};
-format.youtube = function(item, log) {
-    log = log || console.log;
-    log("\n");
-    log(item.url + "\n");
-    log("================================================================\n")
-    log(item.title + "\n")
-    log("================================================================\n")
-    log(item.content + "\n\n");
-};
+    repl.defineCommand('g', {
+        help: 'repl.context.lucky Google Search',
+        action: googleQuery()
+    });
+
+    repl.defineCommand('gif', {
+        help: 'gif image search -> ',
+        action: function(query) {
+            google.gif.search(query).then(function(result) {
+                repl.context.stack = repl.context.stack || []; 
+                repl.context.stack.push(result);
+                var shortResult = result.items.map(item=>'< ' + item.link.toString() + ' > ' + item.title.toString());
+                var is = result.items.map(item=>item.link);
+                repl.context.images = repl.context.images || [];
+                repl.context.images = repl.context.images.concat(is);
+                console.log(shortResult.join(' | ') + ' --> images.random() //try\r\n');
+                repl.displayPrompt();          
+            })
+            
+        }
+    })
+
+    repl.defineCommand('mdn', {
+        help: 'Search Mozilla Development Network',
+        action: googleQuery("javascript site:developer.mozilla.org")
+    });
+    repl.defineCommand('yt', {
+        help: 'youtube search',
+        action: function(query) {
+            repl.context.googlesearch(query + " site:youtube.com").then(list => {
+                repl.context.stack.push(list);
+                var i = 0;
+                while (i++ < 3)
+                    format.youtube(list[i]);
+                repl.displayPrompt();
+            });
+        }
+    });
+    repl.defineCommand('learn', {
+        help: 'learn <command> { help: "helptext", action: function(query) { repl.displayPrompt(); } }',
+        action: function(query) {
+
+            var split = query.split(' ');
+            var command = split.shift();
+            var commandObject = eval(split.join(' '));
+            if (commandObject.help && commandObject.action) {
+                try {
+                    repl.defineCommand(command, {
+                        help: commandObject.help,
+                        action: function(q) {
+                            commandObject.action(q);
+                            repl.displayPrompt();
+                        }
+                    });
+                    console.log('NEW COMMAND:\n\n' + commandObject.help);
+                } catch (e) {
+                    console.log('ERROR: learn command failed. USAGE:\n' + this.help);
+                }
+
+            }
+        }
+    });
+
+    //FORMAT console
+    //---------------
+    var format = {};
+    format.youtube = function(item, log) {
+        log = log || console.log;
+        log("\n");
+        log(item.url + "\n");
+        log("================================================================\n")
+        log(item.title + "\n")
+        log("================================================================\n")
+        log(item.content + "\n\n");
+    };
+        
+    
+}).listen(PORT);
 
 
 //
@@ -171,8 +177,10 @@ format.youtube = function(item, log) {
 
 //CREATE REPL SERVER 
 //===================
-net.createServer(function(socket) {
-    var r = require('repl').start({
+/*
+var terminal, replServer;
+replServer = net.createServer(function(socket) {
+    terminal = require('repl').start({
         prompt: '> ',
         terminal: true,
         output: socket,
@@ -194,13 +202,17 @@ net.createServer(function(socket) {
             callback(result);
 
         }
+      
 
     });
-    r.on('exit', function() {
+    terminal.on('exit', function() {
         socket.end()
     });
+    terminal.context = repl.context;
+    
 }).listen(PORT);
 
+/* */
 
 //Catch uncaught errors
 process.on('uncaught', function(e) {
