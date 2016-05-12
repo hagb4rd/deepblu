@@ -6,8 +6,11 @@
 git clone git@github.com:hagb4rd/deepblu.git
 npm install
 
-#setup environment variables & start via
+#setup environment variables & start repl server like
 node repl.js
+
+#start repl client to connect to the started server
+node repl-client.js
 ```
 ####ENVIRONMENT VARIABLES
 SET (windows) / EXPORT (unix)
