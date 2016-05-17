@@ -48,3 +48,9 @@ Channel list to join on connect (separate by coma, no whitespace)
 ######DEEPBLU_IRC_NICK
 ######DEEPBLU_IRC_PASS
 IRC Client Parameters for the Bot.
+
+
+```
+--> var gifsearch = function(q) { if(!q) return "usage: gifsearch(query)";  google.gif.search(q).then(result=>{gist("```\r\n" + result.items.map(item=>"![" + item.title  + "](" + item.link + ")").join("\r\n")).then(console.log)}) }
+
+```

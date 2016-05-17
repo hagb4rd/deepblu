@@ -35,29 +35,38 @@ replServer = net.createServer(function(socket) {
     //eval: run, //- function that will be used to eval each given line. Defaults to an async wrapper for eval(). See below for an example of a custom eval.
     useColors: false, // - a boolean which specifies whether or not the writer function should output colors. If a different writer function is set then this does nothing. Defaults to the repl's terminal value.
     useGlobal: false, // - if set to true, then the repl will use the global object, instead of running scripts in a separate context. Defaults to false.
-    ignoreUndefined: false, // - if set to true, then the repl will not output the return value of command if it's undefined. Defaults to false.
+    ignoreUndefined: false // - if set to true, then the repl will not output the return value of command if it's undefined. Defaults to false.
     // - the function to invoke for each command that gets evaluated which returns the formatting (including coloring) to display. Defaults to util.inspect.
     //*
-    writer: function(toInspect) { 
-        var showHidden = repl.context.util.inspect.config.showHidden || false;
-        var depth = repl.context.util.inspect.config.depth || 2;
-        var colors = repl.context.util.inspect.config.colors || true;
-        var result = util.inspect(toInspect, {
-                showHidden: showHidden,
-                depth: depth,
-                colors: colors
-            });
-        return result;
-    }
+    
         /* */
         //replMode: magic
     });
     repl.context = new REPLContext(repl);
+    repl.writer = function(toInspect) { 
+        var showHidden = repl.context.util.inspect.config.showHidden || false;
+        var depth = repl.context.util.inspect.config.depth || 0;
+        var colors = repl.context.util.inspect.config.colors || true;
+        var result = toInspect;
+        if(typeof(result) !== 'string') {
+            result = util.inspect(toInspect, {
+                showHidden: showHidden,
+                depth: depth,
+                colors: colors
+            });   
+        } 
+        return result;
+    }
+
+
 
     //.clear RESET context 
     repl.on('reset', (context) => {
         console.log('repl has a new context');
-        return new REPLContext(repl);
+        //context = extend(new REPLContext(repl), context);
+        //context.extend(new REPLContext(repl))
+        context = new REPLContext(repl);
+        
     });
 
     //ready.

@@ -64,7 +64,7 @@ var evalJS = function(context, transpile) {
                 if(cx.console.maxLines > 0) {
                     cx.console.maxLines = cx.console.maxLines -1; 
                     var args = [].slice.call(arguments);
-                    var text = args.map(arg=>{ if(typeof(arg)=='string') { return arg; } else { return cx.util.inspect(arg, {depth:IRCBOT_INSPECT_DEPTH, showHidden:false,colors:false}); }}).join('\r\n');
+                    var text = args.map(arg=>{ if((typeof(arg)=='string') || (arg instanceof Promise)) { return arg; } else { return cx.util.inspect(arg, {depth:IRCBOT_INSPECT_DEPTH, showHidden:false,colors:false}); }}).join('\r\n');
                     //var  text = cx.console.logn(IRCBOT_INSPECT_DEPTH)(obj);
                     cx.console.buffer.push({msg: msg, text: text});    
                     if(!cx.console.flushTimeout)
@@ -107,7 +107,7 @@ var evalJS = function(context, transpile) {
             }
             //Catch uncaught errors
             process.on('uncaught', function(e) {
-                cx.console.log(e);
+                cx.console.log(e.stack);
                 console.log(util.inspect(e,{showHidden: true, depth:null, color: true}));
             });
             
@@ -148,7 +148,7 @@ module.exports = function REPLContext(repl) {
     
     context.util = require('util');
     context.util.inspect.config = {
-        depth: 1,
+        depth: 0,
         showHidden: false,
         colors: false
     };
@@ -158,16 +158,20 @@ module.exports = function REPLContext(repl) {
     context.net = require('net');
     context.http = require('http');
     context.Promise = require('bluebird');
-    context.request = require('request-promise');
-
-    context.gist = require("./lib/gist");
     context.lib = require('./lib/functions');
+    context.Promise.resolveDelayed = context.lib.resolveDelayed;
+    context.Promise.taskify = context.lib.taskify;
+    context.Promise.queue = context.lib.queue;
+    context.sleep = context.Promise.resolveDelayed();
+    context.request = require('request-promise');
+    context.gist = require("./lib/gist");    
     context.db = {};
     context.db.user = new(require('dirty'))('user.db');
     context.db.doc = new(require('dirty'))('doc.db');
     context.db.code = new(require('dirty'))('io.db');
     context.db.git = new(require('dirty'))('git.db');
     context.gist = require('./lib/gist');
+    //context.queue = require('concurrent-task-queue');
     context.bitly = require('./lib/bitly');
     context.google = require('./lib/google');
     var googleImages = require('google-images');
@@ -232,8 +236,7 @@ module.exports = function REPLContext(repl) {
     cx.gist = context.gist;
     cx.su = context.su;
     cx.images = context.images;
-    
-    
+    cx.sleep = context.sleep;
     
     
     context.cx = cx;

@@ -22,7 +22,7 @@ var config = {
     authorize: [(process.env['DEEPBLU_IRC_AUTHORIZE'] || "")],
     trigger: [(process.env['DEEPBLU_IRC_TRIGGER'] || "-->"), this.nick+":"],
     channel: (process.env['DEEPBLU_IRC_CHANNEL']).split(','),
-    unrestricted: (process.env['DEEPBLU_IRC_UNRESTRICTED'] === "true") || true
+    unrestricted: !!process.env['DEEPBLU_IRC_UNRESTRICTED']  || false
     // DEEPBLU_IRC_PASS
 }
 
