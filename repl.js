@@ -35,7 +35,7 @@ replServer = net.createServer(function(socket) {
     //eval: run, //- function that will be used to eval each given line. Defaults to an async wrapper for eval(). See below for an example of a custom eval.
     useColors: false, // - a boolean which specifies whether or not the writer function should output colors. If a different writer function is set then this does nothing. Defaults to the repl's terminal value.
     useGlobal: false, // - if set to true, then the repl will use the global object, instead of running scripts in a separate context. Defaults to false.
-    ignoreUndefined: false // - if set to true, then the repl will not output the return value of command if it's undefined. Defaults to false.
+    ignoreUndefined: true // - if set to true, then the repl will not output the return value of command if it's undefined. Defaults to false.
     // - the function to invoke for each command that gets evaluated which returns the formatting (including coloring) to display. Defaults to util.inspect.
     //*
     
@@ -54,8 +54,11 @@ replServer = net.createServer(function(socket) {
                 depth: depth,
                 colors: colors
             });   
-        } 
-        return result;
+        }
+        if((result instanceof Promise) !== true) 
+        {
+            return result;
+        }
     }
 
 

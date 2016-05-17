@@ -15,14 +15,14 @@ var util = require('util');
 var config = {
     host: process.env['DEEPBLU_IRC_HOST'] || "irc.freenode.net", 
     port: process.env['DEEPBLU_IRC_PORT'] || 6667,
-    nick: process.env['DEEPBLU_IRC_NICK'] || "deepblu12",
+    nick: process.env['DEEPBLU_IRC_NICK'] || "deepblu",
     user: process.env['DEEPBLU_IRC_USER'] || "",
     pfxFile: process.env['DEEPBLU_IRC_PFX_FILEPATH'],
     pfxPass: process.env['DEEPBLU_IRC_PFX_PASS'],
     authorize: [(process.env['DEEPBLU_IRC_AUTHORIZE'] || "")],
-    trigger: [(process.env['DEEPBLU_IRC_TRIGGER'] || "-->"), this.nick+":"],
+    trigger: [(process.env['DEEPBLU_IRC_TRIGGER'] || "-->"), process.env['DEEPBLU_IRC_NICK'] + ":"],
     channel: (process.env['DEEPBLU_IRC_CHANNEL']).split(','),
-    unrestricted: !!process.env['DEEPBLU_IRC_UNRESTRICTED']  || false
+    unrestricted: false
     // DEEPBLU_IRC_PASS
 }
 
@@ -120,10 +120,11 @@ Bot.create = function(nick,user,pass,host,port) {
 module.exports = Bot;
 
 //Catch uncaught errors
+/*
 process.on('uncaught', function(e) {
-    console.log(util.inspect(e, {showHidden: true, depth: null, colors: true}));
+    console.log(util.inspect(e));
 });
-
+/* */
 //------END--------
 //config.channel.forEach((chan)=>client.join(chan));
 //client.namesAsync('##ge').then((names) => console.log(names));

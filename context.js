@@ -13,10 +13,11 @@ var Promise = require('bluebird');
 var gist = require("./lib/gist");
 
 
+
 const IRCBOT_MAX_LINES = 4;
 const IRCBOT_MAX_CHARS = 760;
 const IRCBOT_SPLIT_LINE = 400;
-const IRCBOT_INSPECT_DEPTH = 2;
+const IRCBOT_INSPECT_DEPTH = 1;
 const IRCBOT_FLOODPROTECTION_DELAY = 400;
 const IRCBOT_EXECUTION_TIMEOUT = 12000;
 
@@ -64,9 +65,10 @@ var evalJS = function(context, transpile) {
                 if(cx.console.maxLines > 0) {
                     cx.console.maxLines = cx.console.maxLines -1; 
                     var args = [].slice.call(arguments);
-                    var text = args.map(arg=>{ if((typeof(arg)=='string') || (arg instanceof Promise)) { return arg; } else { return cx.util.inspect(arg, {depth:IRCBOT_INSPECT_DEPTH, showHidden:false,colors:false}); }}).join('\r\n');
+                    var text = args.map(arg=>{ if(arg instanceof Promise) { return undefined; } else if (typeof(arg)=='string') { return arg; } else { return cx.util.inspect(arg, {depth:IRCBOT_INSPECT_DEPTH, showHidden:false,colors:false}); }});
+                    text.forEach(txt=>{if(txt){cx.console.buffer.push({msg: msg, text: txt} )} });
                     //var  text = cx.console.logn(IRCBOT_INSPECT_DEPTH)(obj);
-                    cx.console.buffer.push({msg: msg, text: text});    
+                        
                     if(!cx.console.flushTimeout)
                         cx.console.flush();  
                   }
@@ -103,12 +105,13 @@ var evalJS = function(context, transpile) {
                 var result = script.runInContext(cx);
                 cx.console.log(result);    
             } catch(e) {
-                cx.console.log(e);
+                cx.console.log(util.inspect(e));
             }
             //Catch uncaught errors
+            
             process.on('uncaught', function(e) {
-                cx.console.log(e.stack);
-                console.log(util.inspect(e,{showHidden: true, depth:null, color: true}));
+                cx.console.log(util.inspect(e));
+                console.log(util.inspect(e));
             });
             
         });
@@ -158,6 +161,7 @@ module.exports = function REPLContext(repl) {
     context.net = require('net');
     context.http = require('http');
     context.Promise = require('bluebird');
+    context.Promise.prototype.inspect = function() { return undefined; };
     context.lib = require('./lib/functions');
     context.Promise.resolveDelayed = context.lib.resolveDelayed;
     context.Promise.taskify = context.lib.taskify;
