@@ -69,6 +69,7 @@ replServer = net.createServer(function(socket) {
         //context = extend(new REPLContext(repl), context);
         //context.extend(new REPLContext(repl))
         context = new REPLContext(repl);
+        return context;
         
     });
 
@@ -226,9 +227,43 @@ replServer = net.createServer(function(socket) {
 
 /* */
 
+
+
+var argv = require('minimist')(process.argv);
+
+var port = argv.port || (9898)
+var host = argv.host || "127.0.0.1"
+
+
+
+var sock = net.connect(port, host);
+
+
+process.stdin.pipe(sock)
+sock.pipe(process.stdout)
+sock.on('connect', function () {
+    process.stdin.resume();
+    process.stdin.setRawMode(true)
+})
+sock.on('close', function done() {
+    process.stdin.setRawMode(false)
+    process.stdin.pause()
+    sock.removeListener('close', done)
+})
+process.stdin.on('end', function () {
+    sock.destroy()
+    console.log()
+})
+process.stdin.on('data', function (b) {
+    if (b.length === 1 && b[0] === 4) {
+        process.stdin.emit('end')
+    }
+})
+
+
+module.exports = repl;
+
 //Catch uncaught errors
 process.on('uncaught', function(e) {
     console.log(util.inspect(e,{showHidden: true, depth:null, color: true}));;
 });
-
-module.exports = repl;

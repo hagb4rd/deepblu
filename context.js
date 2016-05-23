@@ -11,13 +11,14 @@ var vm = require('vm');
 var extend = require('extend');
 var Promise = require('bluebird');
 var gist = require("./lib/gist");
+var logdb = require("./logdb");
 
 
 
 const IRCBOT_MAX_LINES = 4;
 const IRCBOT_MAX_CHARS = 760;
 const IRCBOT_SPLIT_LINE = 400;
-const IRCBOT_INSPECT_DEPTH = 1;
+const IRCBOT_INSPECT_DEPTH = 2;
 const IRCBOT_FLOODPROTECTION_DELAY = 400;
 const IRCBOT_EXECUTION_TIMEOUT = 12000;
 
@@ -25,6 +26,8 @@ const IRCBOT_EXECUTION_TIMEOUT = 12000;
 var evalJS = function(context, transpile) {
     return function (irc) {
         irc.on('command', function(msg) {
+            console.log('irc.on("command")','\r\n-------------------------\r\n', util.inspect(msg, {depth: null, shoHidden: true}));
+            
             //var temp = extend(true, context, GLOBAL);
             var cx = vm.createContext(context.cx);
             cx.cx = cx;
@@ -65,12 +68,14 @@ var evalJS = function(context, transpile) {
                 if(cx.console.maxLines > 0) {
                     cx.console.maxLines = cx.console.maxLines -1; 
                     var args = [].slice.call(arguments);
-                    var text = args.map(arg=>{ if(arg instanceof Promise) { return undefined; } else if (typeof(arg)=='string') { return arg; } else { return cx.util.inspect(arg, {depth:IRCBOT_INSPECT_DEPTH, showHidden:false,colors:false}); }});
+                    var text = args.map(arg=>{ if(arg instanceof Promise) { return undefined; } else if (typeof(arg)=='string') { return arg; } else { return cx.util.inspect(arg, {depth:IRCBOT_INSPECT_DEPTH, showHidden:true,colors:false}); }});
                     text.forEach(txt=>{if(txt){cx.console.buffer.push({msg: msg, text: txt} )} });
                     //var  text = cx.console.logn(IRCBOT_INSPECT_DEPTH)(obj);
                         
-                    if(!cx.console.flushTimeout)
-                        cx.console.flush();  
+                    if(!cx.console.flushTimeout) {
+                        //cx.console.flush();  
+                        cx.console.flushTimeout = setTimeout(cx.console.flush, IRCBOT_FLOODPROTECTION_DELAY);
+                    }
                   }
             }
             cx.push = function(obj, more) {
@@ -124,7 +129,7 @@ var evalJS = function(context, transpile) {
 module.exports = function REPLContext(repl) {
     
     //var context = this (REPLContext.prototype) extends GLOBAL;
-    var context = extend(true, this, GLOBAL);
+    var context = extend(true, this, global);
     //contextitify for use with vm module
     vm.createContext(context);    
     //add self reference
@@ -167,7 +172,7 @@ module.exports = function REPLContext(repl) {
     context.Promise.taskify = context.lib.taskify;
     context.Promise.queue = context.lib.queue;
     context.sleep = context.Promise.resolveDelayed();
-    context.request = require('request-promise');
+    context.rp = require('request-promise');
     context.gist = require("./lib/gist");    
     context.db = {};
     context.db.user = new(require('dirty'))('user.db');
@@ -187,17 +192,26 @@ module.exports = function REPLContext(repl) {
         options || {};
         return babel.transform(code, options).code;
     }
-    var Bot = require('./bot');
+    context.Bot = require('./bot');
     //Imagestack
     context.images = [];
 
 
     //Stack
     context.stack = [];
-    context.push = function push(obj) {
-        context.stack.push(obj);
-        console.log(util.inspect(obj,{showHidden:true, depth:null, color:true}));
-        return Promise.resolve(obj);
+    context.push = function push() {
+        var logText = "";
+        var args = [].slice.call(arguments);
+        
+        args.forEach(arg,i,arr => {
+            if(arg) {
+                logText += "cx.stack[" + context.stack.length + "]; // \n";
+                logText += util.inspect(arg, {showHidden:true, depth: null, colors: false});
+                logText += "\n\n";
+                context.stack.push(arg);    
+            }
+        });
+        return Promise.resolve(logText);
     };
     //get latest stack item
     Object.defineProperty(context, '__', {
@@ -207,26 +221,29 @@ module.exports = function REPLContext(repl) {
             } else {
                 return undefined;
             }
-        }
+        },
+        enumerable: true
     });
     
     //context.cd & context.ls 
     context.cd = context; 
     Object.defineProperty(context, 'ls', {
         get: function() {
-            console.log(util.inspect(context.cd, {depth:null, showHidden:true, colors: true }));
+            return util.inspect(context.cd, {showHidden:true, depth: 0});
+            //console.log(util.inspect(context.cd, {depth:null, showHidden:true, colors: true }));
         }
     });
     
     var cx = {};
-    cx.__ = null;
-    cx.stack = [];
+    cx.__ = context.__;
+    cx.stack = context.stack;
+    cx.push = context.push
     cx.setTimeout = setTimeout;
     cx.clearTimeout = clearTimeout;
     cx.process = {};
     cx.process.nextTick = process.nextTick;    
     cx.util = context.util;
-    cx.request = context.request;
+    cx.rp = context.rp;
     cx.google = context.google;
     cx.qs = context.qs;
     cx.net = context.net;
@@ -244,11 +261,13 @@ module.exports = function REPLContext(repl) {
     
     
     context.cx = cx;
-    context.bot = Bot.create();
+    context.bot = context.Bot.create();
+    
+    //context.cx.log = context.log;
     context.bot.client.use(evalJS(context, /* context.babelify */ null ));
     context.bot.channel.forEach(chan=>context.bot.client.join(chan));
     
-    //context.bot = bot.client;
+    
     cx.su = (function() {
         var password = process.env['DEEPBLU_IRC_PASS'];
         return function(pass) {
