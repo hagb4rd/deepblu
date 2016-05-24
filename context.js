@@ -10,8 +10,10 @@ var util = require('util');
 var vm = require('vm');
 var extend = require('extend');
 var Promise = require('bluebird');
+var str = require('./lib/string')
 var gist = require("./lib/gist");
 var logdb = require("./logdb");
+
 
 
 
@@ -78,29 +80,32 @@ var evalJS = function(context, transpile) {
                     }
                   }
             }
-            cx.push = function(obj, more) {
-                /*
-                cx.__ = [].slice.call(arguments);
-                */
-                if(!Array.isArray(cx.stack)) {
-                    cx.stack = [];
-                }
-                var res = "";
-                if(obj) {
-                    res += cx.console.logn(2)(obj);
-                    cx.__ = obj;
-                    cx.stack.push(obj);
-                }
-                if(more) {
-                    res += cx.console.logn(2)(obj);
-                    cx.__ = more;
-                    cx.stack.push(more);
-                }              
-                if(cx.stack.length) {
-                    var pos = cx.stack.length-1;
-                    cx.console.log("stack[" + pos + "] <-//-- \r\n" + res);
-                }
-            };            
+            if(!cx.push) {
+                cx.push = function(obj, more) {
+                    /*
+                    cx.__ = [].slice.call(arguments);
+                    */
+                    if(!Array.isArray(cx.stack)) {
+                        cx.stack = [];
+                    }
+                    var res = "";
+                    if(obj) {
+                        res += cx.console.logn(2)(obj);
+                        cx.__ = obj;
+                        cx.stack.push(obj);
+                    }
+                    if(more) {
+                        res += cx.console.logn(2)(obj);
+                        cx.__ = more;
+                        cx.stack.push(more);
+                    }              
+                    if(cx.stack.length) {
+                        var pos = cx.stack.length-1;
+                        cx.console.log("stack[" + pos + "] <-//-- \r\n" + res);
+                    }
+                };    
+            }
+                        
             try {
                 var transpiled = msg.command;
                 if(transpile) {
@@ -111,11 +116,14 @@ var evalJS = function(context, transpile) {
                 cx.console.log(result);    
             } catch(e) {
                 cx.console.log(util.inspect(e));
+                irc.notice(msg.from, util.inspect(e.message));
             }
             //Catch uncaught errors
             
             process.on('uncaught', function(e) {
+                
                 cx.console.log(util.inspect(e));
+                irc.notice(msg.from, e.message);
                 console.log(util.inspect(e));
             });
             
@@ -168,6 +176,7 @@ module.exports = function REPLContext(repl) {
     context.Promise = require('bluebird');
     context.Promise.prototype.inspect = function() { return undefined; };
     context.lib = require('./lib/functions');
+    context.str = require('./lib/string');
     context.Promise.resolveDelayed = context.lib.resolveDelayed;
     context.Promise.taskify = context.lib.taskify;
     context.Promise.queue = context.lib.queue;
@@ -198,32 +207,8 @@ module.exports = function REPLContext(repl) {
 
 
     //Stack
-    context.stack = [];
-    context.push = function push() {
-        var logText = "";
-        var args = [].slice.call(arguments);
-        
-        args.forEach(arg,i,arr => {
-            if(arg) {
-                logText += "cx.stack[" + context.stack.length + "]; // \n";
-                logText += util.inspect(arg, {showHidden:true, depth: null, colors: false});
-                logText += "\n\n";
-                context.stack.push(arg);    
-            }
-        });
-        return Promise.resolve(logText);
-    };
-    //get latest stack item
-    Object.defineProperty(context, '__', {
-        get: function() {
-            if(context.stack.length) {
-                return context.stack[context.stack.length - 1]
-            } else {
-                return undefined;
-            }
-        },
-        enumerable: true
-    });
+    
+    
     
     //context.cd & context.ls 
     context.cd = context; 
@@ -234,10 +219,37 @@ module.exports = function REPLContext(repl) {
         }
     });
     
-    var cx = {};
+    
+    var cx ={};
+    context.cx = cx;
     cx.__ = context.__;
-    cx.stack = context.stack;
-    cx.push = context.push
+    //Stack
+    cx.stack = [];
+    cx.push = function push() {
+        var logText = "";
+        var args = [].slice.call(arguments);
+        
+        args.forEach(arg,i,arr => {
+            if(arg) {
+                logText += "cx.stack[" + cx.stack.length + "]; // \n";
+                logText += util.inspect(arg, {showHidden:true, depth: null, colors: false});
+                logText += "\n\n";
+                cx.stack.push(arg);    
+            }
+        });
+        return Promise.resolve(logText);
+    };
+    //get latest stack item
+    Object.defineProperty(context.cx, '__', {
+        get: function() {
+            if(context.cx.stack.length) {
+                return context.cx.stack[context.stack.length - 1]
+            } else {
+                return undefined;
+            }
+        }
+        
+    });
     cx.setTimeout = setTimeout;
     cx.clearTimeout = clearTimeout;
     cx.process = {};
@@ -258,6 +270,7 @@ module.exports = function REPLContext(repl) {
     cx.su = context.su;
     cx.images = context.images;
     cx.sleep = context.sleep;
+    cx.str = context.str;
     
     
     context.cx = cx;
