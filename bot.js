@@ -92,7 +92,7 @@ function pong() {
 function replcmd(bot) {
     return function (irc) {
         irc.on('message', function (msg) {
-            if (msg.from != bot.nick) {
+            if (msg.from != bot.client.me) {
                 bot.trigger.concat([bot.client.me+":"]).forEach((prefix) => {
                     if (msg.message.startsWith(prefix)) {
                         //authorized?

@@ -192,7 +192,7 @@ Log.prototype.search = function(_q, _date, _limit, _s) {
       if (_limit)
         cursor = cursor.limit(_limit);
 
-      var query = cursor => {
+      var query = (cursor => {
         cursor.toArray().then(docs => {
           var formatted = Log.format(docs);
           gist(formatted).then(link => {
@@ -200,8 +200,8 @@ Log.prototype.search = function(_q, _date, _limit, _s) {
             resolve(msg);
           })
         });
-      };
-      query();
+      });
+      query(cursor);
     });
   });
 };
