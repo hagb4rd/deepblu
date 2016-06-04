@@ -1,5 +1,8 @@
 //require("babel-polyfill");
 //*
+
+
+
 require('es5-shim');
 require('es6-shim');
 require('es7-shim');
@@ -14,6 +17,7 @@ var str = require('./lib/string')
 var gist = require("./lib/gist");
 var logdb = require("./logdb");
 var regeneratorRuntime = require("regenerator-runtime");
+var config = require("./config");
 
 
 
@@ -30,119 +34,6 @@ var evalJS = function(context, transpile) {
     return function (irc) {
         irc.on('command', function(msg) {
             console.log('irc.on("command")','\r\n-------------------------\r\n', util.inspect(msg, {depth: null, shoHidden: true}));
-            
-            /*
-            var sandbox = (function(context, msg, cs) {
-                var console = {
-                    buffer: [],
-                    maxLines: IRCBOT_MAX_LINES,
-                    flushTimeout: null,
-                    format: {
-                        error: function(e,message) {
-                            message=message||"";
-                            var stack = e.stack.split("\n");
-                            stack[0] = message + stack[0];
-                            return stack.slice(0,3).join("\n");
-                        }
-                    }
-                };
-                console.error = function(e, message) {
-                    cs.log(message, util.inspect(e));
-                    console.format.error(e, message).split("\n").forEach(line,lineNumber => {   
-                        if(msg.private) {
-                            console.log(line);
-                        } else {
-                            irc.notice(msg.from, line);    
-                        }                 
-                        
-                    });
-                };
-                console.flush = function() {    
-                    var next = "";
-                    next += console.buffer.map(x=>x.text).join("\n");
-                    console.buffer = [];
-                    if(next.length) {
-                        var sendMsg = next.replace(/\r/gi, '').replace(/\n/gi, ' ').replace(/\t/gi, ' ').replace(/\s+/gi,' ');
-                        if((sendMsg.length + msg.from.length + 1) > IRCBOT_SPLIT_LINE) {
-                            var part1=sendMsg.slice(0,IRCBOT_SPLIT_LINE);
-                            var part2=sendMsg.slice(IRCBOT_SPLIT_LINE,IRCBOT_MAX_CHARS);
-                            msg.reply(part1);
-                            if(sendMsg.length > IRCBOT_MAX_CHARS) {
-                                gist(next, (new Date).toISOString() + " " + msg.to, msg.from +": "+msg.command).then(function(link) {
-                                    part2 = part2 + " [..] read more: " + link;
-                                    msg.reply(part2);
-                                });
-                            } else {
-                                msg.reply(part2);
-                            }
-                        } else {
-                            //_temp:
-                            msg.reply(sendMsg.slice(0,IRCBOT_SPLIT_LINE));
-                            //irc.send(next.msg.to, sendMsg.slice(0,IRCBOT_SPLIT_LINE));    
-                        }
-                        if(console.buffer.length && (!console.flushTimeout) ) {
-                                console.flushTimeout = setTimeout(function() {
-                                    console.flushTimeout = null;
-                                    console.flush();
-                                }, IRCBOT_FLOODPROTECTION_DELAY);                            
-                        }  
-                    }
-                };
-                console.log = function() {
-                        if(console.maxLines > 0) {
-                            console.maxLines = console.maxLines -1; 
-                            var args = [].slice.call(arguments);
-                            var text = args.map(arg=>{ 
-                                if(arg instanceof Promise) { 
-                                    return undefined; 
-                                } else if (typeof(arg)=='string') { 
-                                    return arg; 
-                                } else if (arg instanceof Error) { 
-                                    return console.log(console.format.error(arg, 'console.log: ')); 
-                                } else { 
-                                    var result = str.echo(arg);
-                                    if(typeof(arg)=='object') {
-                                        var proto=Object.getPrototypeOf(arg);
-                                        if(proto) {
-                                            result += " | prototype: " + str.echo(proto);
-                                        }
-                                    }
-                                    return result; 
-                                }
-                            });
-                            text.forEach(txt => {
-                                if(txt && (txt.toString().trim() != 'undefined')) {
-                                    console.buffer.push({msg: msg, text: txt});
-                                }
-                            });
-                            //var  text = cx.console.logn(IRCBOT_INSPECT_DEPTH)(obj);
-                                
-                            if(!console.flushTimeout) {
-                                console.flushTimeout = setTimeout(function() {
-                                    console.flushTimeout = null; 
-                                    console.flush();
-                                }, IRCBOT_FLOODPROTECTION_DELAY);  
-                            }
-                        }
-                    }
-                    
-                    try {
-                        var transpiled = msg.command;
-                        if(transpile && context.cx.config.BABELIFY) {
-                            transpiled = transpile(msg.command);
-                        }
-                        var result = eval(transpiled);
-                        console.log(result);
-                    } catch(e) {
-                        console.error(e, "catch: ");            
-                    }
-                    
-                    var sandbox = {};
-                    Object.assign(sandbox, context.cx);
-                    return sandbox;
-                }).bind(context.cx, context, msg, console);
-                /* */
-            
             
             
             //var temp = extend(true, context, GLOBAL);
@@ -183,29 +74,32 @@ var evalJS = function(context, transpile) {
             };
             cx.console.error = function(e, message) {
                 message=message||"";
+                console.log(message, util.inspect(e));
                 var stack = e.stack.split("\n");
                 stack[0] = message + stack[0];
-                stack.forEach(line,lineNumber => {
-                    if(lineNumber < 3)
-                        irc.notice(msg.from, line);
-                });
-                console.log(message, util.inspect(e));
+                
+                irc.notice(msg.from, stack[0]);
+                irc.notice(msg.from, stack[1]);
+                irc.notice(msg.from, stack[2]);
+                
             };
-            cx.console.log = function(obj) {
-							if(cx.console.maxLines > 0) {
+            cx.console.log = function(o) {
+			    if(cx.console.maxLines > 0) {
 	                cx.console.maxLines = cx.console.maxLines -1; 
 	                var args = [].slice.call(arguments);
-	                var text = args.map(arg=>{ 
-	                    if(arg instanceof Promise) { 
+	                var text = args.map(obj=>{
+                        console.log(util.inspect(obj, {showHidden:false, depth: null, colors: true})); 
+	                    if(obj instanceof Promise) { 
 	                        return undefined; 
-	                    } else if (typeof(arg)=='string') { 
-	                        return arg; 
-	                    } else if (arg instanceof Error) { 
-	                        return cx.util.inspect(arg); 
+	                    } else if (typeof(obj)=='string') { 
+	                        return obj; 
+	                    } else if (obj instanceof Error) {
+                            cx.console.error(obj, "log: "); 
+	                        return obj; 
 	                    } else { 
-	                        var result = str.echo(arg);
-	                        if(typeof(arg)=='object') {
-	                            var proto=Object.getPrototypeOf(arg);
+	                        var result = str.echo(obj);
+	                        if(typeof(obj)=='object') {
+	                            var proto=Object.getPrototypeOf(obj);
 	                            if(proto) {
 	                                result += " | prototype: " + str.echo(proto);
 	                            }
@@ -214,9 +108,7 @@ var evalJS = function(context, transpile) {
 	                    }
 	                });
 	                text.forEach(txt => {
-	                    if(txt && (txt.toString().trim() != 'undefined')) {
-	                        cx.console.buffer.push({msg: msg, text: txt});
-	                    }
+	                    cx.console.buffer.push({msg: msg, text: txt});
 	                });
 								}
 								/*
@@ -315,15 +207,7 @@ module.exports = function REPLContext(repl) {
         context.repl = repl;
         
     //configuration
-    context.config = {
-        BABELIFY: true,
-        IRCBOT_MAX_LINES: 4,
-        IRCBOT_MAX_CHARS: 760,
-        IRCBOT_SPLIT_LINE: 400, 
-        IRCBOT_INSPECT_DEPTH: 2,
-        IRCBOT_FLOODPROTECTION_DELAY: 400,
-        IRCBOT_EXECUTION_TIMEOUT: 12000
-    };
+    context.config = Object.create(config);
         
     // NPM MODULES
     // -----------
@@ -384,15 +268,20 @@ module.exports = function REPLContext(repl) {
     context.babel = require('babel-core');
     context.babelify = function(code, opt) {
         opt = opt || { presets: ["es2015"], plugins:["syntax-async-functions", "transform-regenerator", "transform-async-to-generator", "transform-async-to-module-method"] };
-        return context.babel.transform(code, opt).code;
+        var code = context.babel.transform(code, opt).code;
+        console.log("BABELIFY:\n","======================\n", code);
+        return code;
     }
-    context.Bot = require('./bot');
-    //Imagestack
-    context.images = [];
-
-
-    //Stack
     
+    //IRC-BOT SETUP
+    //-------------
+    context.Bot = require('./bot');
+    context.bot = context.Bot.create();
+    
+    //context.cx.log = context.log;
+    context.bot.client.use(evalJS(context, /* context.babelify */ context.babelify ));
+    context.bot.channel.forEach(chan=>context.bot.client.join(chan));
+
     
     
     //context.cd & context.ls 
@@ -404,92 +293,85 @@ module.exports = function REPLContext(repl) {
         }
     });
     
-    
-    var cx ={};
-    context.cx = cx;
-    cx.__ = context.__;
     //Stack
-    cx.stack = [];
-    cx.push = function push() {
-        var logText = "";
+    context.stack = [];
+    //Imagestack
+    context.images = [];
+    context.push = function push() {
+        
         var args = [].slice.call(arguments);
         
-        args.forEach(arg,i,arr => {
-            if(arg) {
-                logText += "cx.stack[" + cx.stack.length + "]; // \n";
-                logText += util.inspect(arg, {showHidden:true, depth: null, colors: false});
+        var logText = "";
+        args.forEach(obj => {
+            if(obj) {
+                logText += "cx.stack[" + context.stack.length + "]; // \n";
+                logText += util.inspect(obj, {showHidden:context.config.inspect.showHidden||false, depth: context.config.inspect.depth||0, colors: context.config.inspect.colors||true});
                 logText += "\n\n";
-                cx.stack.push(arg);    
+                context.stack.push(obj);    
             }
         });
         return Promise.resolve(logText);
     };
-    //get latest stack item
-    Object.defineProperty(context.cx, '__', {
+    //get latest item on stack
+    Object.defineProperty(context, '__', {
         get: function() {
-            if(context.cx.stack.length) {
-                return context.cx.stack[context.stack.length - 1]
+            if(context.length) {
+                return context.stack[context.stack.length - 1]
             } else {
                 return undefined;
             }
         }
-        
     });
-    cx.config = context.config;
-    cx.setTimeout = setTimeout;
-    cx.clearTimeout = clearTimeout;
-    cx.cheerio = context.cheerio;
-    cx.process = {};
-    cx.process.nextTick = process.nextTick;    
-    cx.util = context.util;
-    cx.rp = context.rp;
-    cx.request = context.rp;
-    cx.google = context.google;
-    cx.qs = context.qs;
-    cx.net = context.net;
-    cx.vm = context.vm;
-    cx.babel = context.babel;
-    cx.babelify = context.babelify;
-    cx.regeneratorRuntime = context.regeneratorRuntime;
-    cx.bitly = context.bitly;
-    cx.Promise = context.Promise;
-    cx.db = context.db;
-    cx.lib = context.lib;
-    cx.gist = context.gist;
-    cx.su = context.su;
-    cx.images = context.images;
-    cx.sleep = context.sleep;
-    cx.str = context.str;
     
-    
-    
-    context.cx = cx;
-    context.bot = context.Bot.create();
-    
-    //context.cx.log = context.log;
-    context.bot.client.use(evalJS(context, /* context.babelify */ cx.babelify ));
-    context.bot.channel.forEach(chan=>context.bot.client.join(chan));
-    
-    
-    cx.su = (function() {
+    //SAFE CONTEXT
+    context.cx = function(cx) {
         var password = process.env['DEEPBLU_IRC_PASS'];
-        return function(pass) {
-            if(pass===password) {
-                return {
-                    global: GLOBAL,
-                    process: GLOBAL.process,
-                    fs: require('fs'),
-                    bot: context.bot,
-                    config: context.config,
-                    require: require
-                };
-                
-            } else {
-                return 'access denied.';
-            }
-        };
-    }());
-    
+        return {
+            __: cx.__,
+            cx: cx.cx,
+            config: cx.config,
+            setTimeout: setTimeout,
+            clearTimeout: clearTimeout,
+            cheerio: cx.cheerio,
+            process: {
+                nextTick: process.nextTick
+            },    
+            util: cx.util,
+            rp: cx.rp,
+            request: cx.rp,
+            google: cx.google,
+            qs: cx.qs,
+            net: cx.net,
+            vm: cx.vm,
+            babel: cx.babel,
+            babelify: cx.babelify,
+            regeneratorRuntime: cx.regeneratorRuntime,
+            bitly: cx.bitly,
+            Promise: cx.Promise,
+            db: cx.db,
+            lib: cx.lib,
+            gist: cx.gist,
+            images: cx.images,
+            sleep: cx.sleep,
+            str: cx.str,
+            su: function(passphrase) {
+                return function(pass) {
+                    if(pass===password) {
+                        return {
+                            global: GLOBAL,
+                            process: GLOBAL.process,
+                            fs: require('fs'),
+                            bot: context.bot,
+                            config: context.config,
+                            require: require
+                        };   
+                    } else {
+                        return 'access denied.';
+                    }
+                }
+              }(password)
+        }
+    } (context);
 };
 
 

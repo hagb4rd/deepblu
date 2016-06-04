@@ -1,0 +1,9 @@
+module.exports = {
+        BABELIFY: true,
+        IRCBOT_MAX_LINES: 4,
+        IRCBOT_MAX_CHARS: 760,
+        IRCBOT_SPLIT_LINE: 400, 
+        IRCBOT_INSPECT_DEPTH: 2,
+        IRCBOT_FLOODPROTECTION_DELAY: 400,
+        IRCBOT_EXECUTION_TIMEOUT: 12000
+};
