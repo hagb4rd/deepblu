@@ -92,30 +92,47 @@ function pong() {
 function replcmd(bot) {
     return function (irc) {
         irc.on('message', function (msg) {
+            if(msg.to==bot.client.me) {
+                msg.private = true;
+                msg.to=msg.from;
+            } else {
+                msg.private = false;
+            }
+            msg.reply = function(client, cx) {
+                return function(s) {
+                    client.send(cx.to, s);    
+                }
+            }(irc, msg);
             if (msg.from != bot.client.me) {
-                bot.trigger.concat([bot.client.me+":"]).forEach((prefix) => {
-                    if (msg.message.startsWith(prefix)) {
-                        //authorized?
-                        if (bot.authorize.every((authorized) => (authorized != (msg.hostmask.username + "@" + msg.hostmask.hostname)))) {
-                            if (bot.unrestricted) {
-                                msg.command = msg.message.slice(prefix.length);
-                                irc.emit('command', msg);
-                            } else {
-                                irc.send(msg.to, msg.from + ": access denied.");
-                            }
-
-                        } else {
+                if(msg.private) {
+                    msg.command = msg.message;
+                } else {
+                    bot.trigger.concat([bot.client.me+":"]).forEach((prefix) => {
+                        if (msg.message.startsWith(prefix)) {
+                            
                             msg.command = msg.message.slice(prefix.length);
+                        }    
+                    
+                    });
+                }
+                
+                if(msg.command) {
+                    if (bot.unrestricted) {
+                        irc.emit('command', msg);
+                    } else {
+                        if (bot.authorize.every((authorized) => (authorized != (msg.hostmask.username + "@" + msg.hostmask.hostname)))) {
+                            irc.send(msg.to, msg.from + ": access denied.");
+                        } else {
                             irc.emit('command', msg);
                         }
-
-                        return;
-                    }
-                })
-            }
-        });
-    }
+                    }    
+                }
+              }
+            })
+                
+         }
 };
+ 
 function logger(bot) {
     return function (irc) {
         irc.on('welcome', function (msg) {

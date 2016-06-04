@@ -31,6 +31,120 @@ var evalJS = function(context, transpile) {
         irc.on('command', function(msg) {
             console.log('irc.on("command")','\r\n-------------------------\r\n', util.inspect(msg, {depth: null, shoHidden: true}));
             
+            /*
+            var sandbox = (function(context, msg, cs) {
+                var console = {
+                    buffer: [],
+                    maxLines: IRCBOT_MAX_LINES,
+                    flushTimeout: null,
+                    format: {
+                        error: function(e,message) {
+                            message=message||"";
+                            var stack = e.stack.split("\n");
+                            stack[0] = message + stack[0];
+                            return stack.slice(0,3).join("\n");
+                        }
+                    }
+                };
+                console.error = function(e, message) {
+                    cs.log(message, util.inspect(e));
+                    console.format.error(e, message).split("\n").forEach(line,lineNumber => {   
+                        if(msg.private) {
+                            console.log(line);
+                        } else {
+                            irc.notice(msg.from, line);    
+                        }                 
+                        
+                    });
+                };
+                console.flush = function() {    
+                    var next = "";
+                    next += console.buffer.map(x=>x.text).join("\n");
+                    console.buffer = [];
+                    if(next.length) {
+                        var sendMsg = next.replace(/\r/gi, '').replace(/\n/gi, ' ').replace(/\t/gi, ' ').replace(/\s+/gi,' ');
+                        if((sendMsg.length + msg.from.length + 1) > IRCBOT_SPLIT_LINE) {
+                            var part1=sendMsg.slice(0,IRCBOT_SPLIT_LINE);
+                            var part2=sendMsg.slice(IRCBOT_SPLIT_LINE,IRCBOT_MAX_CHARS);
+                            msg.reply(part1);
+                            if(sendMsg.length > IRCBOT_MAX_CHARS) {
+                                gist(next, (new Date).toISOString() + " " + msg.to, msg.from +": "+msg.command).then(function(link) {
+                                    part2 = part2 + " [..] read more: " + link;
+                                    msg.reply(part2);
+                                });
+                            } else {
+                                msg.reply(part2);
+                            }
+                        } else {
+                            //_temp:
+                            msg.reply(sendMsg.slice(0,IRCBOT_SPLIT_LINE));
+                            //irc.send(next.msg.to, sendMsg.slice(0,IRCBOT_SPLIT_LINE));    
+                        }
+                        if(console.buffer.length && (!console.flushTimeout) ) {
+                                console.flushTimeout = setTimeout(function() {
+                                    console.flushTimeout = null;
+                                    console.flush();
+                                }, IRCBOT_FLOODPROTECTION_DELAY);                            
+                        }  
+                    }
+                };
+                console.log = function() {
+                        if(console.maxLines > 0) {
+                            console.maxLines = console.maxLines -1; 
+                            var args = [].slice.call(arguments);
+                            var text = args.map(arg=>{ 
+                                if(arg instanceof Promise) { 
+                                    return undefined; 
+                                } else if (typeof(arg)=='string') { 
+                                    return arg; 
+                                } else if (arg instanceof Error) { 
+                                    return console.log(console.format.error(arg, 'console.log: ')); 
+                                } else { 
+                                    var result = str.echo(arg);
+                                    if(typeof(arg)=='object') {
+                                        var proto=Object.getPrototypeOf(arg);
+                                        if(proto) {
+                                            result += " | prototype: " + str.echo(proto);
+                                        }
+                                    }
+                                    return result; 
+                                }
+                            });
+                            text.forEach(txt => {
+                                if(txt && (txt.toString().trim() != 'undefined')) {
+                                    console.buffer.push({msg: msg, text: txt});
+                                }
+                            });
+                            //var  text = cx.console.logn(IRCBOT_INSPECT_DEPTH)(obj);
+                                
+                            if(!console.flushTimeout) {
+                                console.flushTimeout = setTimeout(function() {
+                                    console.flushTimeout = null; 
+                                    console.flush();
+                                }, IRCBOT_FLOODPROTECTION_DELAY);  
+                            }
+                        }
+                    }
+                    
+                    try {
+                        var transpiled = msg.command;
+                        if(transpile && context.cx.config.BABELIFY) {
+                            transpiled = transpile(msg.command);
+                        }
+                        var result = eval(transpiled);
+                        console.log(result);
+                    } catch(e) {
+                        console.error(e, "catch: ");            
+                    }
+                    
+                    var sandbox = {};
+                    Object.assign(sandbox, context.cx);
+                    return sandbox;
+                }).bind(context.cx, context, msg, console);
+                /* */
+            
+            
+            
             //var temp = extend(true, context, GLOBAL);
             var cx = vm.createContext(context.cx);
             cx.cx = cx;
@@ -55,14 +169,28 @@ var evalJS = function(context, transpile) {
                             irc.send(next.msg.to, part2);
                         }
                     } else {
-                        irc.send(next.msg.to, sendMsg.slice(0,IRCBOT_SPLIT_LINE));    
+                        //_temp:
+                        msg.reply(sendMsg.slice(0,IRCBOT_SPLIT_LINE));
+                        //irc.send(next.msg.to, sendMsg.slice(0,IRCBOT_SPLIT_LINE));    
                     }
                     if(cx.console.buffer.length) {
                             cx.console.flushTimeout = cx.setTimeout(cx.console.flush, IRCBOT_FLOODPROTECTION_DELAY);
+                    } else {
+                        cx.console.flushTimeout = null;
                     }
                         
                 }
                     
+            };
+            cx.console.error = function(e, message) {
+                message=message||"";
+                var stack = e.stack.split("\n");
+                stack[0] = message + stack[0];
+                stack.forEach(line,lineNumber => {
+                    if(lineNumber < 3)
+                        irc.notice(msg.from, line);
+                });
+                console.log(message, util.inspect(e));
             };
             cx.console.log = function(obj) {
                 if(cx.console.maxLines > 0) {
@@ -100,30 +228,40 @@ var evalJS = function(context, transpile) {
             }
             if(!cx.push) {
                 cx.push = function(obj, more) {
-                    /*
-                    cx.__ = [].slice.call(arguments);
-                    */
+                    
+                    var args = [].slice.call(arguments);
+                    if(args.length == 1) {
+                        if(Array.isArray(args[0])) {
+                            args = args[0];                            
+                        }
+                    } else if (!args.length) {
+                        throw new TypeError("Missing arguments");
+                    }
+                    
                     if(!Array.isArray(cx.stack)) {
                         cx.stack = [];
                     }
+                    
+                    cx.stack.push(args);
+                    cx.__ = args;
+                    
                     var res = "";
-                    if(obj) {
-                        res += cx.console.logn(2)(obj);
-                        cx.__ = obj;
-                        cx.stack.push(obj);
-                    }
-                    if(more) {
-                        res += cx.console.logn(2)(obj);
-                        cx.__ = more;
-                        cx.stack.push(more);
-                    }              
+                    args.forEach(obj => {
+                        res += util.inspect(obj, {showHidden: true, depth: 2, colors: true});
+                        // cx.console.logn(2)(obj);
+                        
+                    });
+                               
                     if(cx.stack.length) {
                         var pos = cx.stack.length-1;
-                        cx.console.log("stack[" + pos + "] <-//-- \r\n" + res);
+                        res = "stack[" + pos + "] <-//-- \r\n" + res;
                     }
+                    cx.console.log(res);
+                    return res;
                 };    
             }
-                        
+            
+            //*
             try {
                 var transpiled = msg.command;
                 if(transpile && cx.config.BABELIFY) {
@@ -131,28 +269,19 @@ var evalJS = function(context, transpile) {
                 }
                 var script = new vm.Script(transpiled, { filename: 'context.vm', timeout: IRCBOT_EXECUTION_TIMEOUT });
                 var result = script.runInContext(cx);
-                console.log("\r\n======================================================================\r\n",result,"\r\n======================================================================\r\n");
-                cx.console.log(result);    
-            } catch(e) {
-                console.log(util.inspect(e));
-                //irc.notice(msg.from, e.message);
-                irc.notice(msg.from, util.inspect(e));
-            }
-            //Catch uncaught errors
-            
-            process.on('uncaught', function(e) {
+                cx.console.log(result);
                 
-                //cx.console.log(e);
-                //irc.notice(msg.from, e.message);
-                irc.notice(msg.from, util.inspect(e));
-                console.log(util.inspect(e));
+                console.log("\r\n======================================================================\r\n",result,"\r\n======================================================================\r\n");    
+            } catch(e) {
+                cx.console.error(e, "catch: ");            
+            }
+            /* */
+            //Catch uncaught errors
+            process.on('uncaught', function(e) {
+                cx.console.error(e, "uncaught: ");
             });
             process.on('unresolved', function(e) {
-                
-                //cx.console.log(e);
-                //irc.notice(msg.from, e.message);
-                irc.notice(msg.from, util.inspect(e));
-                console.log(util.inspect(e));
+                cx.console.error(e, "unresolved: ");
             });
             
         });
