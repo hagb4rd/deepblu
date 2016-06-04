@@ -173,14 +173,13 @@ var evalJS = function(context, transpile) {
                         msg.reply(sendMsg.slice(0,IRCBOT_SPLIT_LINE));
                         //irc.send(next.msg.to, sendMsg.slice(0,IRCBOT_SPLIT_LINE));    
                     }
-                    if(cx.console.buffer.length) {
-                            cx.console.flushTimeout = cx.setTimeout(cx.console.flush, IRCBOT_FLOODPROTECTION_DELAY);
-                    } else {
-                        cx.console.flushTimeout = null;
-                    }
-                        
-                }
-                    
+                    if(cx.console.buffer.length && (!cx.console.flushTimeout)) {
+                        cx.console.flushTimeout = setTimeout(function() {
+                            cx.console.flushTimeout = null; 
+                            cx.console.flush();
+                        }, IRCBOT_FLOODPROTECTION_DELAY);  
+                    }       
+                }        
             };
             cx.console.error = function(e, message) {
                 message=message||"";
@@ -193,39 +192,53 @@ var evalJS = function(context, transpile) {
                 console.log(message, util.inspect(e));
             };
             cx.console.log = function(obj) {
-                if(cx.console.maxLines > 0) {
-                    cx.console.maxLines = cx.console.maxLines -1; 
-                    var args = [].slice.call(arguments);
-                    var text = args.map(arg=>{ 
-                        if(arg instanceof Promise) { 
-                            return undefined; 
-                        } else if (typeof(arg)=='string') { 
-                            return arg; 
-                        } else if (arg instanceof Error) { 
-                            return cx.util.inspect(arg); 
-                        } else { 
-                            var result = str.echo(arg);
-                            if(typeof(arg)=='object') {
-                                var proto=Object.getPrototypeOf(arg);
-                                if(proto) {
-                                    result += " | prototype: " + str.echo(proto);
-                                }
-                            }
-                            return result; 
+							if(cx.console.maxLines > 0) {
+	                cx.console.maxLines = cx.console.maxLines -1; 
+	                var args = [].slice.call(arguments);
+	                var text = args.map(arg=>{ 
+	                    if(arg instanceof Promise) { 
+	                        return undefined; 
+	                    } else if (typeof(arg)=='string') { 
+	                        return arg; 
+	                    } else if (arg instanceof Error) { 
+	                        return cx.util.inspect(arg); 
+	                    } else { 
+	                        var result = str.echo(arg);
+	                        if(typeof(arg)=='object') {
+	                            var proto=Object.getPrototypeOf(arg);
+	                            if(proto) {
+	                                result += " | prototype: " + str.echo(proto);
+	                            }
+	                        }
+	                        return result; 
+	                    }
+	                });
+	                text.forEach(txt => {
+	                    if(txt && (txt.toString().trim() != 'undefined')) {
+	                        cx.console.buffer.push({msg: msg, text: txt});
+	                    }
+	                });
+								}
+								/*
+								if(cx.console.maxLines > 0) {
+                    cx.console.maxLines = cx.console.maxLines -1;
+                    var text = str.echo(obj);
+                    if(typeof(obj)=='object') {
+                        var proto=Object.getPrototypeOf(arg);
+                        if(proto) {
+                            text += " | prototype: " + str.echo(proto);
                         }
-                    });
-                    text.forEach(txt => {
-                        if(txt && (txt.toString().trim() != 'undefined')) {
-                            cx.console.buffer.push({msg: msg, text: txt});
-                        }
-                    });
-                    //var  text = cx.console.logn(IRCBOT_INSPECT_DEPTH)(obj);
-                        
-                    if(!cx.console.flushTimeout) {
-                        cx.console.flush();  
                     }
-                  }
-            }
+                    cx.console.buffer.push({msg: msg, text: text});
+                }
+								/* */
+                if(!cx.console.flushTimeout) {
+                    cx.console.flushTimeout = setTimeout(function() {
+                        cx.console.flushTimeout = null; 
+                        cx.console.flush();
+                    }, IRCBOT_FLOODPROTECTION_DELAY);  
+                }
+            };
             if(!cx.push) {
                 cx.push = function(obj, more) {
                     
