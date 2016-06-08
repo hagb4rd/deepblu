@@ -33,25 +33,64 @@ const IRCBOT_EXECUTION_TIMEOUT = 12000;
 var evalJS = function(context, transpile) {
     return function (irc) {
         irc.on('command', function(msg) {
-            console.log('irc.on("command")','\r\n-------------------------\r\n', util.inspect(msg, {depth: null, showHidden: true}));
+            console.log('irc.on("command")','\r\n-------------------------\r\n', util.inspect(msg, {depth: 2, showHidden: false}));
             
             
             //var temp = extend(true, context, GLOBAL);
             var cx = vm.createContext(context.cx);
+            
+            //circular
             cx.cx = cx;
             cx.console = require('./lib/logwriter');
+
+            //allow log access in public mode
+            if(!msg.private) {
+                cx.log = {
+                    from: function(date) {
+                        date = date || (new Date(Date.now() - msg.log.defaultTimeFromNow));
+                        var channel = msg.to;
+
+                        return msg.log.from(date, channel).then(result => { 
+                            cx.console.log(result);
+                            return result;
+                        });
+                    },
+                    search: function(query) {
+                        var channel = msg.to; 
+                        return msg.log.search(query, channel).then(result => { 
+                            cx.console.log(result);
+                            return result;
+                        });
+                    }
+                }
+            };
+
+            cx.admin = function() { 
+                        if(msg.authorized) { 
+                            return context.getSecureContext(); 
+                        } else {
+
+                            return "access denied.";
+                        }
+                    };
             
+            
+            
+            
+
             //Format functions
             cx.console.format = function(obj) {
                 //log to terminal using util.inspect
                 console.log(cx.console.format.terminal(obj)); 
                 
-                if(obj instanceof Promise) { 
-                    return "[Promise]"; 
-                } else if (typeof(obj)=='string') { 
+                if(obj instanceof Promise || typeof(obj) === 'undefined' || obj === 'use strict' ) { 
+                    return undefined; 
+                } else if (typeof(obj)==='string') { 
                     return obj; 
+                } else if (typeof(obj)==='function') {
+                    return obj.toString();
                 } else if (obj instanceof Error) {
-                    return cx.console.format.error(obj, "log: "); 
+                    throw(obj); //return cx.console.format.error(obj, "log: "); 
                 } else if ((typeof(obj)==='object') && (!Array.isArray(obj))) {
                     var result = context.str.echo(obj);
                     var proto=Object.getPrototypeOf(obj);
@@ -81,11 +120,13 @@ var evalJS = function(context, transpile) {
                 return result; 
             };
             cx.console.format.terminal = function(e) {
-                return util.inspect(e, {showHidden: context.config.inspect.showHidden, depth: context.config.inspect.depth, colors: context.config.inspect.colors})
+                return util.inspect(e, {showHidden: config.inspect.showHidden, depth: config.inspect.depth, colors: config.inspect.colors})
             };
             //cx.console.maxLines = IRCBOT_MAX_LINES;
             cx.console.maxLines = context.config.bot.maxLines;
+            
             cx.console.flushTimeout = null;
+
             cx.console.flush = function() {    
                 //max length line example: maxLine -("earendel".length  + ": ".length); 
                 var splitLine = context.config.bot.splitLine - (msg.from.length + 2);
@@ -94,25 +135,26 @@ var evalJS = function(context, transpile) {
                 var next = msg.buffer.filter(x=>(typeof(x) !== 'undefined')).join('\n\n');
                 //reset buffer
                 msg.buffer = [];
-                                
-                //holds reply for IRC client -> msg.reply() 
-                return new Promise(function(resolve, reject) {
-                    var reply = "";
-                    if(next.length > context.config.bot.maxChars) {
-                        gist(next, (new Date).toISOString() + " " + msg.to, msg.from +": "+msg.command).then(function(link) {
-                            reply = next.slice(0,context.config.bot.maxChars) + " [..] read more: ";
-                            reply = reply.replace(/\r/gi, '').replace(/\n/gi, ' ').replace(/\t/gi, ' ').replace(/\s+/gi,' ');
-                            reply += "\n" + link; 
-                            resolve(context.str.chunkify(reply, splitLine));
-                        }) 
-                    } else {
-                        reply = next.replace(/\r/gi, '').replace(/\n/gi, ' ').replace(/\t/gi, ' ').replace(/\s+/gi,' ');
-                        resolve(context.str.chunkify(reply, splitLine))
-                    }   
-                }).then(chunks => {
-                    chunks.forEach(chunk=>msg.reply(chunk));
-                });
-                
+
+                if(next) {
+                    //holds reply for IRC client -> msg.reply() 
+                    return new Promise(function(resolve, reject) {
+                        var reply = "";
+                        if(next.length > context.config.bot.maxChars) {
+                            gist(next, (new Date).toISOString() + " " + msg.to, msg.from +": "+msg.command).then(function(link) {
+                                reply = next.slice(0,context.config.bot.maxChars) + " [..] read more: ";
+                                reply = reply.replace(/\r/gi, '').replace(/\n/gi, ' ').replace(/\t/gi, ' ').replace(/\s+/gi,' ');
+                                reply += "\n" + link; 
+                                resolve(context.str.chunkify(reply, splitLine));
+                            }) 
+                        } else {
+                            reply = next.replace(/\r/gi, '').replace(/\n/gi, ' ').replace(/\t/gi, ' ').replace(/\s+/gi,' ');
+                            resolve(context.str.chunkify(reply, splitLine))
+                        }   
+                    }).then(chunks => {
+                        chunks.forEach(chunk=>msg.reply(chunk));
+                    });
+                }
             };        
             cx.console.error = function(e, message) {                
                 var stack = cx.console.format.error(e, message).split('\n');    
@@ -138,8 +180,7 @@ var evalJS = function(context, transpile) {
                 }
                 msg.buffer = msg.buffer.concat(buffer);
                     
-                if(msg.buffer.length > 0)
-                {
+                if(msg.buffer.length > 0) {
                     if(!cx.console.flushTimeout) {
                         if(cx.console.maxLines >= 0) { 
                             cx.console.flushTimeout = setTimeout(function() {
@@ -148,7 +189,7 @@ var evalJS = function(context, transpile) {
                                 cx.console.flush();
                             }, context.config.bot.floodProtection);  
                         }
-                }
+                    }
                 }
                 
             };
@@ -190,14 +231,14 @@ var evalJS = function(context, transpile) {
             //*
             try {
                 var transpiled = msg.command;
-                if(transpile && cx.config.BABELIFY) {
+                if(transpile && context.config.BABELIFY) {
                    transpiled = transpile(msg.command);
                 }
                 var script = new vm.Script(transpiled, { filename: 'context.vm', timeout: context.config.bot.timeout });
                 var result = script.runInContext(cx);
                 cx.console.log(result);
                 
-                console.log("\r\n======================================================================\r\n",result,"\r\n======================================================================\r\n");    
+                //console.log("\r\n======================================================================\r\n",result,"\r\n======================================================================\r\n");    
             } catch(e) {
                 cx.console.error(e, "catch: ");            
             }
@@ -310,8 +351,8 @@ module.exports = function REPLContext(repl) {
         args.forEach(obj => {
             if(obj) {
                 logText += "cx.stack[" + context.stack.length + "]; // \n";
-                logText += util.inspect(obj, {showHidden:context.config.inspect.showHidden||false, depth: context.config.inspect.depth||0, colors: context.config.inspect.colors||true});
-                logText += "\n\n";
+                //logText += util.inspect(obj, {showHidden:context.config.inspect.showHidden||false, depth: context.config.inspect.depth||0, colors: context.config.inspect.colors||true});
+                //logText += "\n\n";
                 context.stack.push(obj);    
             }
         });
@@ -328,9 +369,21 @@ module.exports = function REPLContext(repl) {
         }
     });
     
+    //define secure context for operators
+    context.getSecureContext = function() { 
+        return  {
+            global: GLOBAL,
+            process: GLOBAL.process,
+            fs: require('fs'),
+            bot: context.bot,
+            config: context.config,
+            require: require
+        };
+    } 
+
     //SAFE CONTEXT
     context.cx = function(cx) {
-        var password = process.env['DEEPBLU_IRC_PASS'];
+        
         return {
             __: cx.__,
             cx: cx.cx,
@@ -338,6 +391,7 @@ module.exports = function REPLContext(repl) {
             setTimeout: setTimeout,
             clearTimeout: clearTimeout,
             cheerio: cx.cheerio,
+            dirty: cx.dirty,
             process: {
                 nextTick: process.nextTick
             },    
@@ -356,25 +410,20 @@ module.exports = function REPLContext(repl) {
             db: cx.db,
             lib: cx.lib,
             gist: cx.gist,
-            images: cx.images,
+            push: cx.push,
             sleep: cx.sleep,
             str: cx.str,
+            stack: cx.stack,
+            images: cx.images,
             su: function(passphrase) {
                 return function(pass) {
-                    if(pass===password) {
-                        return {
-                            global: GLOBAL,
-                            process: GLOBAL.process,
-                            fs: require('fs'),
-                            bot: context.bot,
-                            config: context.config,
-                            require: require
-                        };   
+                    if(pass===passphrase) {
+                        return context.admin;  
                     } else {
                         return 'access denied.';
                     }
                 }
-              }(password)
+              }(process.env['DEEPBLU_IRC_PASS'])
         }
     } (context);
 };

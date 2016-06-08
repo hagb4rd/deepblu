@@ -7,7 +7,7 @@ var MongoClient = require('mongodb').MongoClient;
 var gist = require("./lib/gist");
 
 
-const LOGDB_CONNECTION_STRING = process.env['LOGDB_CONNECTION_STRING'] || 'mongodb://127.0.0.1:27017/test';
+const LOGDB_CONNECTION_STRING = process.env['DEEPBLU_IRC_LOGDB'] || 'mongodb://127.0.0.1:27017/test';
 
 
 var Log = function Log(connectionString, collectionName, ensureIndex) {
@@ -86,7 +86,7 @@ Log.prototype.collection = function() {
 };
 
 
-Log.prototype.limit = 5000;
+Log.prototype.limit = 10000;
 
 Log.prototype.ignoreChannel = 'jslave';
 
@@ -95,8 +95,8 @@ Log.prototype.from = function(_date, _channel, _limit) {
   if (typeof(_date) != "object") {
     _date = new Date(Date.parse(_date));
   }
-  _channel = _channel || "jslave";
-  this.search({
+  _channel = _channel || "##javascript";
+  return this.search({
     $and: [{
       channel: {
         $eq: _channel
@@ -110,7 +110,7 @@ Log.prototype.from = function(_date, _channel, _limit) {
 };
 Log.prototype.from.defaultTimeFromNow = 24 * 60 * 60 * 1000;
 
-
+/*
 Log.prototype.gist = function(err, docs) {
   return new Promise((resolve, reject) => {
     if (err)
@@ -120,8 +120,8 @@ Log.prototype.gist = function(err, docs) {
     })
   });
 };
-
-Log.prototype.search = function(_q, _date, _limit, _s) {
+/* */
+Log.prototype.search = function(_q, _channel, _date, _limit, _s) {
   self=this;
   return new Promise(function(resolve, reject) {
     var q = _q || {};
@@ -168,7 +168,7 @@ Log.prototype.search = function(_q, _date, _limit, _s) {
             }
           }, {
             'channel': {
-              $ne: self.ignoreChannel
+              $eq: _channel
             }
           }]
         };
@@ -180,27 +180,45 @@ Log.prototype.search = function(_q, _date, _limit, _s) {
     self.collection().then(collection => {
       var cursor = collection.find(q);
       var s = _s || {
-        date: 1
+        date: -1
       };
       if (s)
         cursor = cursor.sort(s);
       _limit = _limit || self.limit;
       if (_limit)
         cursor = cursor.limit(_limit);
-
+      if(!_s) {
+        cursor = cursor.sort({date: 1});
+      }
       var query = (cursor => {
         cursor.toArray().then(docs => {
-          var formatted = Log.format(docs);
-          gist(formatted).then(link => {
-            var msg = "Rows selected: " + docs.length + " | preview: " + link;
+          if(docs.length > 0) {
+            var formatted = Log.format(docs);
+            gist(formatted).then(link => {
+              var msg = "Rows selected: " + docs.length + " | preview: " + link;
+              resolve(msg);
+            })
+          } else {
+            var msg = "Rows selected: 0 - No matching logs found.";
             resolve(msg);
-          })
+          }
         });
       });
       query(cursor);
     });
   });
 };
+
+Log.format = function (_rows) {
+			var rows = _rows || [];
+			var text = "";
+			rows.forEach(function (row, index) {
+				var d = new Date(row.date);
+				//var d = row.date;
+				text += d.toISOString().substr(0, 16).replace("T", "  [ ") + " ] " + row.channel + " <" + row.user + ">  " + row.text + "\n";
+			});
+			return text;
+		};
 
 Log.Factory = {
   "irc.german-elite.net": function() {

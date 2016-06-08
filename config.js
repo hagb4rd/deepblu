@@ -9,7 +9,7 @@ module.exports = {
     timeout: 12000
   },
   inspect: {
-    depth: 0,
+    depth: 1,
     colors: false,
     showHidden: false
   },

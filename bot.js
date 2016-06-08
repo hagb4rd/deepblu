@@ -24,7 +24,7 @@ var config = {
     trigger: [process.env['DEEPBLU_IRC_TRIGGER'] || "-->"],
     channel: (process.env['DEEPBLU_IRC_CHANNEL']).split(','),
     logging: false,
-    unrestricted: false
+    unrestricted: true
     // DEEPBLU_IRC_PASS
 };
 
@@ -92,17 +92,31 @@ function pong() {
 function replcmd(bot) {
     return function (irc) {
         irc.on('message', function (msg) {
+            //check authorization
+            if (bot.authorize.every((authorized) => (authorized != (msg.hostmask.username + "@" + msg.hostmask.hostname)))) {
+                msg.authorized = false;
+            } else {
+                msg.authorized = true;
+            }
+            //check if private message (query)
             if(msg.to==bot.client.me) {
                 msg.private = true;
                 msg.to=msg.from;
             } else {
                 msg.private = false;
             }
+            //generate reply function
             msg.reply = function(client, cx) {
                 return function(s) {
                     client.send(cx.to, cx.from + ": " + s);    
                 }
             }(irc, msg);
+            
+            //create log reference 
+            msg.log = bot.log;
+            
+                      
+            //avoid selftrigger for bot
             if (msg.from != bot.client.me) {
                 if(msg.private) {
                     msg.command = msg.message;
@@ -117,13 +131,13 @@ function replcmd(bot) {
                 }
                 
                 if(msg.command) {
-                    if (bot.unrestricted) {
+                    if (!msg.private && bot.unrestricted) {
                         irc.emit('command', msg);
                     } else {
-                        if (bot.authorize.every((authorized) => (authorized != (msg.hostmask.username + "@" + msg.hostmask.hostname)))) {
-                            irc.send(msg.to, msg.from + ": access denied.");
-                        } else {
+                        if (msg.authorized) {
                             irc.emit('command', msg);
+                        } else {
+                            irc.send(msg.to, msg.from + ": access denied. If you like to contribute in the development process, please contact earendel.");
                         }
                     }    
                 }
