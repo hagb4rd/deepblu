@@ -33,7 +33,7 @@ const IRCBOT_EXECUTION_TIMEOUT = 12000;
 var evalJS = function(context, transpile) {
     return function (irc) {
         irc.on('command', function(msg) {
-            console.log('irc.on("command")','\r\n-------------------------\r\n', util.inspect(msg, {depth: null, shoHidden: true}));
+            console.log('irc.on("command")','\r\n-------------------------\r\n', util.inspect(msg, {depth: null, showHidden: true}));
             
             
             //var temp = extend(true, context, GLOBAL);
@@ -100,8 +100,9 @@ var evalJS = function(context, transpile) {
                     var reply = "";
                     if(next.length > context.config.bot.maxChars) {
                         gist(next, (new Date).toISOString() + " " + msg.to, msg.from +": "+msg.command).then(function(link) {
-                            reply = next.slice(0,context.config.bot.maxChars) += " [..] read more: " + link;
+                            reply = next.slice(0,context.config.bot.maxChars) + " [..] read more: ";
                             reply = reply.replace(/\r/gi, '').replace(/\n/gi, ' ').replace(/\t/gi, ' ').replace(/\s+/gi,' ');
+                            reply += "\n" + link; 
                             resolve(context.str.chunkify(reply, splitLine));
                         }) 
                     } else {

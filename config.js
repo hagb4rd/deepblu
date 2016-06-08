@@ -10,7 +10,7 @@ module.exports = {
   },
   inspect: {
     depth: 0,
-    colors: true,
+    colors: false,
     showHidden: false
   },
   BABELIFY: true,
