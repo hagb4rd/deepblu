@@ -10,10 +10,6 @@ var gist = require("./lib/gist");
 const LOGDB_CONNECTION_STRING = process.env['LOGDB_CONNECTION_STRING'] || 'mongodb://127.0.0.1:27017/test';
 
 
-
-
-
-
 var Log = function Log(connectionString, collectionName, ensureIndex) {
 
   //state

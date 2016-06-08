@@ -100,7 +100,7 @@ function replcmd(bot) {
             }
             msg.reply = function(client, cx) {
                 return function(s) {
-                    client.send(cx.to, s);    
+                    client.send(cx.to, cx.from + ": " + s);    
                 }
             }(irc, msg);
             if (msg.from != bot.client.me) {

@@ -40,96 +40,116 @@ var evalJS = function(context, transpile) {
             var cx = vm.createContext(context.cx);
             cx.cx = cx;
             cx.console = require('./lib/logwriter');
-            cx.console.buffer = [];
-            cx.console.maxLines = IRCBOT_MAX_LINES;
+            
+            //Format functions
+            cx.console.format = function(obj) {
+                //log to terminal using util.inspect
+                console.log(cx.console.format.terminal(obj)); 
+                
+                if(obj instanceof Promise) { 
+                    return "[Promise]"; 
+                } else if (typeof(obj)=='string') { 
+                    return obj; 
+                } else if (obj instanceof Error) {
+                    return cx.console.format.error(obj, "log: "); 
+                } else if ((typeof(obj)==='object') && (!Array.isArray(obj))) {
+                    var result = context.str.echo(obj);
+                    var proto=Object.getPrototypeOf(obj);
+                    if(proto) {
+                        result += " | prototype: " + str.echo(proto);
+                    }
+                    return result;
+                } else {
+                    return util.inspect(obj,{showHiden:null,depth:1, colors: false});
+                }
+                
+            };
+            cx.console.format.error = function(e, message) {
+                message=message||"Error: ";
+                var stack = e.stack.split("\n");
+                stack[0] = message + " " + e.message + ", " + stack[0];
+                return stack.slice(0,3).join("\n");
+            };
+            cx.console.format.object = function(obj) {
+                var result = context.str.echo(obj);
+                if(typeof(obj)=='object') {
+                    var proto=Object.getPrototypeOf(obj);
+                    if(proto) {
+                        result += " | prototype: " + str.echo(proto);
+                    }
+                }
+                return result; 
+            };
+            cx.console.format.terminal = function(e) {
+                return util.inspect(e, {showHidden: context.config.inspect.showHidden, depth: context.config.inspect.depth, colors: context.config.inspect.colors})
+            };
+            //cx.console.maxLines = IRCBOT_MAX_LINES;
+            cx.console.maxLines = context.config.bot.maxLines;
             cx.console.flushTimeout = null;
             cx.console.flush = function() {    
-                var next = cx.console.buffer.pop();
-                if(next) {
-                    var sendMsg = next.msg.from + ": " + next.text.replace(/\r/gi, '').replace(/\n/gi, ' ').replace(/\t/gi, ' ').replace(/\s+/gi,' ');
-                    if(sendMsg.length > IRCBOT_SPLIT_LINE) {
-                        var part1=sendMsg.slice(0,IRCBOT_SPLIT_LINE);
-                        var part2=next.msg.from +": "+sendMsg.slice(IRCBOT_SPLIT_LINE,IRCBOT_MAX_CHARS);
-                        irc.send(next.msg.to, part1);
-                        if(sendMsg.length > IRCBOT_MAX_CHARS) {
-                            gist(next.text, (new Date).toISOString() + " " + next.msg.to, msg.from +": "+msg.command).then(function(link) {
-                                part2 = part2 + " [..] read more: " + link;
-                                irc.send(next.msg.to, part2);
-                            });
-                        } else {
-                            irc.send(next.msg.to, part2);
-                        }
+                //max length line example: maxLine -("earendel".length  + ": ".length); 
+                var splitLine = context.config.bot.splitLine - (msg.from.length + 2);
+                
+                //grab and join all messages from the current receipent that are not undefined 
+                var next = msg.buffer.filter(x=>(typeof(x) !== 'undefined')).join('\n\n');
+                //reset buffer
+                msg.buffer = [];
+                                
+                //holds reply for IRC client -> msg.reply() 
+                return new Promise(function(resolve, reject) {
+                    var reply = "";
+                    if(next.length > context.config.bot.maxChars) {
+                        gist(next, (new Date).toISOString() + " " + msg.to, msg.from +": "+msg.command).then(function(link) {
+                            reply = next.slice(0,context.config.bot.maxChars) += " [..] read more: " + link;
+                            reply = reply.replace(/\r/gi, '').replace(/\n/gi, ' ').replace(/\t/gi, ' ').replace(/\s+/gi,' ');
+                            resolve(context.str.chunkify(reply, splitLine));
+                        }) 
                     } else {
-                        //_temp:
-                        msg.reply(sendMsg.slice(0,IRCBOT_SPLIT_LINE));
-                        //irc.send(next.msg.to, sendMsg.slice(0,IRCBOT_SPLIT_LINE));    
-                    }
-                    if(cx.console.buffer.length && (!cx.console.flushTimeout)) {
-                        cx.console.flushTimeout = setTimeout(function() {
-                            cx.console.flushTimeout = null; 
-                            cx.console.flush();
-                        }, IRCBOT_FLOODPROTECTION_DELAY);  
-                    }       
-                }        
-            };
-            cx.console.error = function(e, message) {
-                message=message||"";
-                console.log(message, util.inspect(e));
-                var stack = e.stack.split("\n");
-                stack[0] = message + stack[0];
+                        reply = next.replace(/\r/gi, '').replace(/\n/gi, ' ').replace(/\t/gi, ' ').replace(/\s+/gi,' ');
+                        resolve(context.str.chunkify(reply, splitLine))
+                    }   
+                }).then(chunks => {
+                    chunks.forEach(chunk=>msg.reply(chunk));
+                });
                 
-                irc.notice(msg.from, stack[0]);
-                irc.notice(msg.from, stack[1]);
-                irc.notice(msg.from, stack[2]);
+            };        
+            cx.console.error = function(e, message) {                
+                var stack = cx.console.format.error(e, message).split('\n');    
                 
+                if(msg.private) {
+                    msg.reply(stack[0]);
+                    msg.reply(stack[1]);
+                    msg.reply(stack[2]);
+                } else {
+                    irc.notice(msg.from, stack[0]);
+                    irc.notice(msg.from, stack[1]);
+                    irc.notice(msg.from, stack[2]);    
+                }         
             };
-            cx.console.log = function(o) {
-			    if(cx.console.maxLines > 0) {
-	                cx.console.maxLines = cx.console.maxLines -1; 
-	                var args = [].slice.call(arguments);
-	                var text = args.map(obj=>{
-                        console.log(util.inspect(obj, {showHidden:false, depth: null, colors: true})); 
-	                    if(obj instanceof Promise) { 
-	                        return undefined; 
-	                    } else if (typeof(obj)=='string') { 
-	                        return obj; 
-	                    } else if (obj instanceof Error) {
-                            cx.console.error(obj, "log: "); 
-	                        return obj; 
-	                    } else { 
-	                        var result = str.echo(obj);
-	                        if(typeof(obj)=='object') {
-	                            var proto=Object.getPrototypeOf(obj);
-	                            if(proto) {
-	                                result += " | prototype: " + str.echo(proto);
-	                            }
-	                        }
-	                        return result; 
-	                    }
-	                });
-	                text.forEach(txt => {
-	                    cx.console.buffer.push({msg: msg, text: txt});
-	                });
-								}
-								/*
-								if(cx.console.maxLines > 0) {
-                    cx.console.maxLines = cx.console.maxLines -1;
-                    var text = str.echo(obj);
-                    if(typeof(obj)=='object') {
-                        var proto=Object.getPrototypeOf(arg);
-                        if(proto) {
-                            text += " | prototype: " + str.echo(proto);
+            cx.console.log = function() {
+			    
+                var args = [].slice.call(arguments);
+                
+                var buffer = args.map(obj => cx.console.format(obj));
+                
+                if(typeof(msg.buffer) === 'undefined') {
+                    msg.buffer = [];
+                }
+                msg.buffer = msg.buffer.concat(buffer);
+                    
+                if(msg.buffer.length > 0)
+                {
+                    if(!cx.console.flushTimeout) {
+                        if(cx.console.maxLines >= 0) { 
+                            cx.console.flushTimeout = setTimeout(function() {
+                                cx.console.maxLines--;
+                                cx.console.flushTimeout = undefined; 
+                                cx.console.flush();
+                            }, context.config.bot.floodProtection);  
                         }
-                    }
-                    cx.console.buffer.push({msg: msg, text: text});
                 }
-								/* */
-                if(!cx.console.flushTimeout) {
-                    cx.console.flushTimeout = setTimeout(function() {
-                        cx.console.flushTimeout = null; 
-                        cx.console.flush();
-                    }, IRCBOT_FLOODPROTECTION_DELAY);  
                 }
+                
             };
             if(!cx.push) {
                 cx.push = function(obj, more) {
@@ -172,7 +192,7 @@ var evalJS = function(context, transpile) {
                 if(transpile && cx.config.BABELIFY) {
                    transpiled = transpile(msg.command);
                 }
-                var script = new vm.Script(transpiled, { filename: 'context.vm', timeout: IRCBOT_EXECUTION_TIMEOUT });
+                var script = new vm.Script(transpiled, { filename: 'context.vm', timeout: context.config.bot.timeout });
                 var result = script.runInContext(cx);
                 cx.console.log(result);
                 
@@ -210,23 +230,7 @@ module.exports = function REPLContext(repl) {
     context.config = Object.create(config);
         
     // NPM MODULES
-    // -----------
-    /*
-    context.global = context;
-    context.root = context;
-    context.GLOBAL = context;
-    context.process = {};
-    /* */
-    //context.repl.context.global = context;
-    //context.repl.context.root = context;
-    //context.repl.context.GLOBAL = context;
-    //context.repl.context.process = {};
-    //
-    //context.es5shim = require('es5-shim');
-    //context.es6shim = require('es6-shim');
-    //context.es7shim = require('es7-shim');
-    //context.fs = require('fs');
-    
+    // -----------    
     context.util = require('util');
     context.util.inspect.config = {
         depth: 0,
