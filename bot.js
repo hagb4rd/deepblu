@@ -24,7 +24,7 @@ var config = {
     trigger: [process.env['DEEPBLU_IRC_TRIGGER'] || "-->"],
     channel: (process.env['DEEPBLU_IRC_CHANNEL']).split(','),
     logging: false,
-    unrestricted: true
+    unrestricted: false
     // DEEPBLU_IRC_PASS
 };
 
@@ -52,7 +52,7 @@ function Bot(nick, user, pass, host, port) {
             port: self.port
         };
         self.stream = tls.connect(tlsOptions, () => {
-            console.log('Socket conntected', util.inspect(self.stream, { showHidden: false, depth: 0, colors: true }));
+            console.log('Socket conntected', util.inspect(self.stream, { showHidden: false, depth: 0, colors: false }));
         })
     } else {
         self.stream = net.connect({ port: self.port, host: self.host });

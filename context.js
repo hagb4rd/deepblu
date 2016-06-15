@@ -19,9 +19,6 @@ var logdb = require("./logdb");
 var regeneratorRuntime = require("regenerator-runtime");
 var config = require("./config");
 
-
-
-
 const IRCBOT_MAX_LINES = 4;
 const IRCBOT_MAX_CHARS = 760;
 const IRCBOT_SPLIT_LINE = 400;
@@ -33,7 +30,7 @@ const IRCBOT_EXECUTION_TIMEOUT = 12000;
 var evalJS = function(context, transpile) {
     return function (irc) {
         irc.on('command', function(msg) {
-            console.log('irc.on("command")','\r\n-------------------------\r\n', util.inspect(msg, {depth: 2, showHidden: false}));
+            console.log('irc.on("command")','\r\n-------------------------\r\n', util.inspect(msg, {depth: 1, showHidden: false, colors: false}));
             
             
             //var temp = extend(true, context, GLOBAL);
@@ -81,16 +78,19 @@ var evalJS = function(context, transpile) {
             //Format functions
             cx.console.format = function(obj) {
                 //log to terminal using util.inspect
-                console.log(cx.console.format.terminal(obj)); 
+                //console.log(cx.console.format.terminal(obj)); 
                 
+
+
+
                 if(obj instanceof Promise || typeof(obj) === 'undefined' || obj === 'use strict' ) { 
                     return undefined; 
                 } else if (typeof(obj)==='string') { 
                     return obj; 
                 } else if (typeof(obj)==='function') {
                     return obj.toString();
-                } else if (obj instanceof Error) {
-                    throw(obj); //return cx.console.format.error(obj, "log: "); 
+                //} else if (obj instanceof Error) {
+                //    throw(obj); //return cx.console.format.error(obj, "log: "); 
                 } else if ((typeof(obj)==='object') && (!Array.isArray(obj))) {
                     var result = context.str.echo(obj);
                     var proto=Object.getPrototypeOf(obj);
@@ -104,9 +104,9 @@ var evalJS = function(context, transpile) {
                 
             };
             cx.console.format.error = function(e, message) {
-                message=message||"Error: ";
-                var stack = e.stack.split("\n");
-                stack[0] = message + " " + e.message + ", " + stack[0];
+                message=str.stripAnsi(message)||"Error: ";
+                var stack = str.stripAnsi(e.stack).split("\n");
+                stack[0] = message + " " + str.stripAnsi(e.message) + ", " + stack[0];
                 return stack.slice(0,3).join("\n");
             };
             cx.console.format.object = function(obj) {
@@ -120,7 +120,7 @@ var evalJS = function(context, transpile) {
                 return result; 
             };
             cx.console.format.terminal = function(e) {
-                return util.inspect(e, {showHidden: config.inspect.showHidden, depth: config.inspect.depth, colors: config.inspect.colors})
+                return util.inspect(e, {showHidden: context.config.inspect.showHidden, depth: context.config.inspect.depth, colors: context.config.inspect.colors})
             };
             //cx.console.maxLines = IRCBOT_MAX_LINES;
             cx.console.maxLines = context.config.bot.maxLines;
@@ -169,6 +169,10 @@ var evalJS = function(context, transpile) {
                     irc.notice(msg.from, stack[2]);    
                 }         
             };
+
+            /**
+             * Writes to irc client & console
+             */
             cx.console.log = function() {
 			    
                 var args = [].slice.call(arguments);
@@ -214,7 +218,7 @@ var evalJS = function(context, transpile) {
                     
                     var res = "";
                     args.forEach(obj => {
-                        res += util.inspect(obj, {showHidden: true, depth: 2, colors: true});
+                        res += util.inspect(obj, {showHidden: false, depth: 1, colors: false});
                         // cx.console.logn(2)(obj);
                         
                     });
@@ -229,10 +233,12 @@ var evalJS = function(context, transpile) {
             }
             
             //*
+            // Eval Command
+            /*=============*/
             try {
                 var transpiled = msg.command;
-                if(transpile && context.config.BABELIFY) {
-                   transpiled = transpile(msg.command);
+                if(context.babelify && context.config.BABELIFY) {
+                   transpiled = context.babelify(msg.command);
                 }
                 var script = new vm.Script(transpiled, { filename: 'context.vm', timeout: context.config.bot.timeout });
                 var result = script.runInContext(cx);
@@ -275,7 +281,7 @@ module.exports = function REPLContext(repl) {
     // -----------    
     context.util = require('util');
     context.util.inspect.config = {
-        depth: 0,
+        depth: 1,
         showHidden: false,
         colors: false
     };
@@ -285,7 +291,6 @@ module.exports = function REPLContext(repl) {
     context.net = require('net');
     context.http = require('http');
     context.Promise = require('bluebird');
-    context.Promise.prototype.inspect = function() { return undefined; };
     context.lib = require('./lib/functions');
     context.str = require('./lib/string');
     context.cheerio = require('cheerio');
@@ -312,11 +317,12 @@ module.exports = function REPLContext(repl) {
     context.google.lucky = require('./lib/googlesearch').lucky;
     context.regeneratorRuntime = require("regenerator-runtime");
     context.babel = require('babel-core');
+    context.babel.opt = { presets: ["es2015"], plugins:["syntax-async-functions", "transform-regenerator", "transform-async-to-generator", "transform-async-to-module-method"] };
     context.babelify = function(code, opt) {
-        opt = opt || { presets: ["es2015"], plugins:["syntax-async-functions", "transform-regenerator", "transform-async-to-generator", "transform-async-to-module-method"] };
-        var code = context.babel.transform(code, opt).code;
-        console.log("BABELIFY:\n","======================\n", code);
-        return code;
+        opt = opt || context.babel.opt;
+        var transpiled = context.babel.transform(code, opt).code;
+        console.log("\n", "BABELIFY:","\n======================\n", transpiled, "\n-----------------------\n\n");
+        return transpiled;
     }
     
     //IRC-BOT SETUP
@@ -325,7 +331,7 @@ module.exports = function REPLContext(repl) {
     context.bot = context.Bot.create();
     
     //context.cx.log = context.log;
-    context.bot.client.use(evalJS(context, /* context.babelify */ context.babelify ));
+    context.bot.client.use(evalJS(context /* context.babelify */));
     context.bot.channel.forEach(chan=>context.bot.client.join(chan));
 
     
@@ -334,7 +340,7 @@ module.exports = function REPLContext(repl) {
     context.cd = context; 
     Object.defineProperty(context, 'ls', {
         get: function() {
-            return util.inspect(context.cd, {showHidden:true, depth: 0});
+            return util.inspect(context.cd, {showHidden:false, depth: 1});
             //console.log(util.inspect(context.cd, {depth:null, showHidden:true, colors: true }));
         }
     });
@@ -361,7 +367,7 @@ module.exports = function REPLContext(repl) {
     //get latest item on stack
     Object.defineProperty(context, '__', {
         get: function() {
-            if(context.length) {
+            if(context.stack.length) {
                 return context.stack[context.stack.length - 1]
             } else {
                 return undefined;
@@ -418,7 +424,7 @@ module.exports = function REPLContext(repl) {
             su: function(passphrase) {
                 return function(pass) {
                     if(pass===passphrase) {
-                        return context.admin;  
+                        return cx.getSecureContext();  
                     } else {
                         return 'access denied.';
                     }

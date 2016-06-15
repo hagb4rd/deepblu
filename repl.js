@@ -14,6 +14,7 @@ var lib = require('./lib/functions');
 var google = require('./lib/google');
 //repl context module
 var REPLContext = require('./context');
+var config = require('./config');
 
 
 // REPL Options
@@ -31,7 +32,7 @@ replServer = net.createServer(function(socket) {
     prompt: "> ", //the prompt and stream for all I/O. Defaults to > .
     input: socket, // - the readable stream to listen to. Defaults to process.stdin.
     output: socket, //- the writable stream to write readline data to. Defaults to process.stdout.
-    terminal: true, // - pass true if the stream should be treated like a TTY, and have ANSI/VT100 escape codes written to it. Defaults to checking isTTY on the output stream upon instantiation.
+    terminal: false, // - pass true if the stream should be treated like a TTY, and have ANSI/VT100 escape codes written to it. Defaults to checking isTTY on the output stream upon instantiation.
     //eval: run, //- function that will be used to eval each given line. Defaults to an async wrapper for eval(). See below for an example of a custom eval.
     useColors: false, // - a boolean which specifies whether or not the writer function should output colors. If a different writer function is set then this does nothing. Defaults to the repl's terminal value.
     useGlobal: false, // - if set to true, then the repl will use the global object, instead of running scripts in a separate context. Defaults to false.
@@ -44,9 +45,9 @@ replServer = net.createServer(function(socket) {
     });
     repl.context = new REPLContext(repl);
     repl.writer = function(toInspect) { 
-        var showHidden = repl.context.util.inspect.config.showHidden || false;
-        var depth = repl.context.util.inspect.config.depth || 0;
-        var colors = repl.context.util.inspect.config.colors || true;
+        var showHidden = config.inspect.showHidden || false;
+        var depth = config.inspect.depth || 1;
+        var colors = config.inspect.colors || false;
         var result = toInspect;
         if(typeof(result) !== 'string') {
             result = util.inspect(toInspect, {
@@ -55,6 +56,7 @@ replServer = net.createServer(function(socket) {
                 colors: colors
             });   
         }
+        repl.displayPrompt();
         if((result instanceof Promise) !== true) 
         {
             return result;
@@ -265,5 +267,5 @@ module.exports = repl;
 
 //Catch uncaught errors
 process.on('uncaught', function(e) {
-    console.log(util.inspect(e,{showHidden: true, depth:null, color: true}));;
+    console.log(util.inspect(e,{showHidden: true, depth:null, color: false}));;
 });
