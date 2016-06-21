@@ -92,8 +92,6 @@ function pong() {
 function replcmd(bot) {
     return function (irc) {
         irc.on('message', function (msg) {
-            //create bot reference
-            msg.bot = bot;
 
 
             //update user hostmask

@@ -49,8 +49,8 @@ var evalJS = function(context, transpile) {
                         throw TypeError('su(password, hostmask): missing argument');
                     }
                     if(pass===passphrase) {
-                        if(!msg.bot.authorize.includes(hostmask)) {
-                            msg.bot.authorize.push(hostmask);
+                        if(!context.bot.authorize.includes(hostmask)) {
+                            context.bot.authorize.push(hostmask);
                         }
                         return hostmask + " is now authorized."  
                     } else {
@@ -433,7 +433,7 @@ module.exports = function REPLContext(repl) {
     //SAFE CONTEXT
     context.cx = function(cx) {
         
-        return vm.createContext({
+        return {
             __: cx.__,
             cx: cx.cx,
             config: cx.config,
@@ -467,7 +467,7 @@ module.exports = function REPLContext(repl) {
             stack: cx.stack,
             images: cx.images
             
-        })
+        }
     } (context);
 
 };

@@ -32,7 +32,7 @@ replServer = net.createServer(function(socket) {
     prompt: "> ", //the prompt and stream for all I/O. Defaults to > .
     input: socket, // - the readable stream to listen to. Defaults to process.stdin.
     output: socket, //- the writable stream to write readline data to. Defaults to process.stdout.
-    terminal: false, // - pass true if the stream should be treated like a TTY, and have ANSI/VT100 escape codes written to it. Defaults to checking isTTY on the output stream upon instantiation.
+    terminal: true, // - pass true if the stream should be treated like a TTY, and have ANSI/VT100 escape codes written to it. Defaults to checking isTTY on the output stream upon instantiation.
     //eval: run, //- function that will be used to eval each given line. Defaults to an async wrapper for eval(). See below for an example of a custom eval.
     useColors: false, // - a boolean which specifies whether or not the writer function should output colors. If a different writer function is set then this does nothing. Defaults to the repl's terminal value.
     useGlobal: false, // - if set to true, then the repl will use the global object, instead of running scripts in a separate context. Defaults to false.
@@ -43,7 +43,7 @@ replServer = net.createServer(function(socket) {
         /* */
         //replMode: magic
     });
-    repl.context = (new REPLContext(repl)).cx;
+    repl.context = new REPLContext(repl);
     repl.writer = function(toInspect) { 
         var showHidden = config.inspect.showHidden || false;
         var depth = config.inspect.depth || 1;
@@ -56,7 +56,7 @@ replServer = net.createServer(function(socket) {
                 colors: colors
             });   
         }
-        repl.displayPrompt();
+        //crepl.displayPrompt();
         if((result instanceof Promise) !== true) 
         {
             return result;
@@ -69,7 +69,7 @@ replServer = net.createServer(function(socket) {
     repl.on('reset', (context) => {
         console.log('repl has a new context');
         //context = extend(new REPLContext(repl), context);
-        context = extend(context, (new REPLContext(repl)).cx)
+        context = extend(context, new REPLContext(repl))
         //context = (new REPLContext(repl)).cx;
         return context;
         
