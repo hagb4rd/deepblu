@@ -5,7 +5,7 @@ module.exports = {
     floodProtection: 400,
     splitLine: 400,
     maxChars: 760,
-    maxCharsPrivate: 2300,
+    maxCharsPrivate: 4*760,
     maxLines: 4,
     maxLinesPrivate: 8,
     timeout: 10000

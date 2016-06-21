@@ -36,6 +36,7 @@
     "babel-preset-es2015": "^6.9.0",
     "bluebird": "^3.3.5",
     "cheerio": "^0.20.0",
+    "concurrent-task-queue": "0.0.3",
     "extend": "^3.0.0",
     "minimist": "^1.2.0",
     "regenerator": "^0.8.46",
