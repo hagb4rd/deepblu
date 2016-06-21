@@ -43,7 +43,7 @@ replServer = net.createServer(function(socket) {
         /* */
         //replMode: magic
     });
-    repl.context = new REPLContext(repl);
+    repl.context = (new REPLContext(repl)).cx;
     repl.writer = function(toInspect) { 
         var showHidden = config.inspect.showHidden || false;
         var depth = config.inspect.depth || 1;
@@ -69,8 +69,8 @@ replServer = net.createServer(function(socket) {
     repl.on('reset', (context) => {
         console.log('repl has a new context');
         //context = extend(new REPLContext(repl), context);
-        //context.extend(new REPLContext(repl))
-        context = new REPLContext(repl);
+        context = extend(context, (new REPLContext(repl)).cx)
+        //context = (new REPLContext(repl)).cx;
         return context;
         
     });

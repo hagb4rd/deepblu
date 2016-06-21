@@ -19,12 +19,14 @@ var logdb = require("./logdb");
 var regeneratorRuntime = require("regenerator-runtime");
 var config = require("./config");
 
+/*
 const IRCBOT_MAX_LINES = 4;
 const IRCBOT_MAX_CHARS = 760;
 const IRCBOT_SPLIT_LINE = 400;
 const IRCBOT_INSPECT_DEPTH = 2;
 const IRCBOT_FLOODPROTECTION_DELAY = 400;
 const IRCBOT_EXECUTION_TIMEOUT = 12000;
+/* */
 
 //SLATE-IRC plugin
 var evalJS = function(context, transpile) {
@@ -38,6 +40,27 @@ var evalJS = function(context, transpile) {
             
             //circular
             cx.cx = cx;
+
+            cx.su = function(passphrase) {
+                return function(pass, hostmask) {
+                    if(msg && msg.hostmask && msg.hostmask.user) {
+                        hostmask = hostmask || msg.hostmask.user;
+                    } else if (!hostmask) { 
+                        throw TypeError('su(password, hostmask): missing argument');
+                    }
+                    if(pass===passphrase) {
+                        if(!msg.bot.authorize.includes(hostmask)) {
+                            msg.bot.authorize.push(hostmask);
+                        }
+                        return hostmask + " is now authorized."  
+                    } else {
+                        return 'access denied.';
+                    }
+                }
+              }(process.env['DEEPBLU_IRC_PASS']);
+            
+
+
             cx.console = require('./lib/logwriter');
 
             //allow log access in public mode
@@ -124,12 +147,18 @@ var evalJS = function(context, transpile) {
             };
             //cx.console.maxLines = IRCBOT_MAX_LINES;
             cx.console.maxLines = context.config.bot.maxLines;
+            if(msg.private)
+                cx.console.maxLines = context.config.bot.maxLinesPrivate;
             
             cx.console.flushTimeout = null;
 
             cx.console.flush = function() {    
                 //max length line example: maxLine -("earendel".length  + ": ".length); 
                 var splitLine = context.config.bot.splitLine - (msg.from.length + 2);
+                var maxChars = context.config.bot.maxChars;
+                if(msg.private) {
+                    maxChars = context.config.bot.maxCharsPrivate;
+                }
                 
                 //grab and join all messages from the current receipent that are not undefined 
                 var next = msg.buffer.filter(x=>(typeof(x) !== 'undefined')).join('\n\n');
@@ -140,9 +169,9 @@ var evalJS = function(context, transpile) {
                     //holds reply for IRC client -> msg.reply() 
                     return new Promise(function(resolve, reject) {
                         var reply = "";
-                        if(next.length > context.config.bot.maxChars) {
+                        if(next.length > maxChars) {
                             gist(next, (new Date).toISOString() + " " + msg.to, msg.from +": "+msg.command).then(function(link) {
-                                reply = next.slice(0,context.config.bot.maxChars) + " [..] read more: ";
+                                reply = next.slice(0,maxChars) + " [..] read more: ";
                                 reply = reply.replace(/\r/gi, '').replace(/\n/gi, ' ').replace(/\t/gi, ' ').replace(/\s+/gi,' ');
                                 reply += "\n" + link; 
                                 resolve(context.str.chunkify(reply, splitLine));
@@ -235,19 +264,29 @@ var evalJS = function(context, transpile) {
             //*
             // Eval Command
             /*=============*/
-            try {
-                var transpiled = msg.command;
-                if(context.babelify && context.config.BABELIFY) {
-                   transpiled = context.babelify(msg.command);
+
+            cx.eval = function eval(command, sandbox) {
+                try {
+                    sandbox = sandbox || cx;
+                    var transpiled = command||'';
+                    
+                    if(context.babelify && context.config.BABELIFY) {
+                        transpiled = context.babelify(command);
+                    }
+                    var script = new vm.Script(transpiled, { filename: 'context.vm', timeout: context.config.bot.timeout });
+                    
+                    if(!vm.isContext(sandbox)) {
+                        sandbox = vm.createContext(sandbox);
+                    }
+                    var result = script.runInContext(sandbox);
+                    cx.console.log(result);
+                    return result;
+                    //console.log("\r\n======================================================================\r\n",result,"\r\n======================================================================\r\n");    
+                } catch(e) {
+                    cx.console.error(e, "catch: ");            
                 }
-                var script = new vm.Script(transpiled, { filename: 'context.vm', timeout: context.config.bot.timeout });
-                var result = script.runInContext(cx);
-                cx.console.log(result);
-                
-                //console.log("\r\n======================================================================\r\n",result,"\r\n======================================================================\r\n");    
-            } catch(e) {
-                cx.console.error(e, "catch: ");            
             }
+            cx.eval(msg.command, cx)
             /* */
             //Catch uncaught errors
             process.on('uncaught', function(e) {
@@ -280,12 +319,14 @@ module.exports = function REPLContext(repl) {
     // NPM MODULES
     // -----------    
     context.util = require('util');
+    /*
+    //todo:
     context.util.inspect.config = {
         depth: 1,
         showHidden: false,
         colors: false
     };
-    
+    /* */
     context.qs = require('querystring');
     context.vm = require('vm');
     context.net = require('net');
@@ -294,6 +335,8 @@ module.exports = function REPLContext(repl) {
     context.lib = require('./lib/functions');
     context.str = require('./lib/string');
     context.cheerio = require('cheerio');
+    context._ = require('underscore');
+    context.moment = require('moment');
     context.Promise.resolveDelayed = context.lib.resolveDelayed;
     context.Promise.taskify = context.lib.taskify;
     context.Promise.queue = context.lib.queue;
@@ -390,13 +433,15 @@ module.exports = function REPLContext(repl) {
     //SAFE CONTEXT
     context.cx = function(cx) {
         
-        return {
+        return vm.createContext({
             __: cx.__,
             cx: cx.cx,
             config: cx.config,
             setTimeout: setTimeout,
             clearTimeout: clearTimeout,
             cheerio: cx.cheerio,
+            _: cx._,
+            moment: cx.moment,
             dirty: cx.dirty,
             process: {
                 nextTick: process.nextTick
@@ -420,18 +465,11 @@ module.exports = function REPLContext(repl) {
             sleep: cx.sleep,
             str: cx.str,
             stack: cx.stack,
-            images: cx.images,
-            su: function(passphrase) {
-                return function(pass) {
-                    if(pass===passphrase) {
-                        return cx.getSecureContext();  
-                    } else {
-                        return 'access denied.';
-                    }
-                }
-              }(process.env['DEEPBLU_IRC_PASS'])
-        }
+            images: cx.images
+            
+        })
     } (context);
+
 };
 
 

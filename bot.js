@@ -92,12 +92,22 @@ function pong() {
 function replcmd(bot) {
     return function (irc) {
         irc.on('message', function (msg) {
-            //check authorization
-            if (bot.authorize.every((authorized) => (authorized != (msg.hostmask.username + "@" + msg.hostmask.hostname)))) {
+            //create bot reference
+            msg.bot = bot;
+
+
+            //update user hostmask
+            msg.hostmask.user = msg.hostmask.username + "@" + msg.hostmask.hostname; 
+
+
+            //check authorization - if none of the the authorized user hostmasks matches the hostmask of the user who send message
+            if (bot.authorize.every(authorized => authorized != msg.hostmask.user)) {
                 msg.authorized = false;
             } else {
                 msg.authorized = true;
             }
+
+            
             //check if private message (query)
             if(msg.to==bot.client.me) {
                 msg.private = true;
@@ -108,7 +118,8 @@ function replcmd(bot) {
             //generate reply function
             msg.reply = function(client, cx) {
                 return function(s) {
-                    client.send(cx.to, cx.from + ": " + s);    
+                    client.send(cx.to, cx.from + ": " + s);   
+                    console.log(cx.to, cx.from + ": " + s); 
                 }
             }(irc, msg);
             
@@ -128,6 +139,13 @@ function replcmd(bot) {
                         }    
                     
                     });
+                    bot.trigger.concat([bot.client.me+":"]).forEach((prefix) => {
+                        if (msg.message.startsWith(prefix)) {
+                            
+                            msg.command = msg.message.slice(prefix.length);
+                        }    
+                    
+                    });
                 }
                 
                 if(msg.command) {
@@ -136,6 +154,13 @@ function replcmd(bot) {
                     } else {
                         if (msg.authorized) {
                             irc.emit('command', msg);
+                        } else if(msg.command.startsWith('login')) {
+                            var split = msg.command.split(' ');
+                            if(split.length > 1) {
+                                 msg.command = 'su("' +  split[1] + '")';
+                                 irc.emit('command', msg);
+                            }
+
                         } else {
                             irc.send(msg.to, msg.from + ": access denied. If you like to contribute in the development process, please contact earendel.");
                         }
