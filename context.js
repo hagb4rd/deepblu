@@ -327,6 +327,9 @@ module.exports = function REPLContext(repl) {
         colors: false
     };
     /* */
+    context.es5 = require('es5-shim');
+    context.es6 = require('es6-shim');
+    context.es7 = require('es7-shim');
     context.qs = require('querystring');
     context.vm = require('vm');
     context.net = require('net');
