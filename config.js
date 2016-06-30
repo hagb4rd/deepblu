@@ -1,14 +1,14 @@
 module.exports = {
-  timeout: 10000,
   babelify: true,
   bot: {
     floodProtection: 400,
+    floodProtectionMaxLog: 30,
     splitLine: 400,
     maxChars: 760,
     maxCharsPrivate: 4*760,
     maxLines: 4,
     maxLinesPrivate: 8,
-    timeout: 10000
+    timeout: 5000
   },
   inspect: {
     depth: 1,

@@ -62,6 +62,7 @@ var evalJS = function(context, transpile) {
 
 
             cx.console = require('./lib/logwriter');
+            cx.console.max = context.config.bot.floodProtectionMaxLog;
 
             //allow log access in public mode
             if(!msg.private) {
@@ -204,62 +205,72 @@ var evalJS = function(context, transpile) {
              */
             cx.console.log = function() {
 			    
-                var args = [].slice.call(arguments);
+                if(cx.console.max-- > 0) {
+
+                    var args = [].slice.call(arguments);
                 
-                var buffer = args.map(obj => cx.console.format(obj));
+                    var buffer = args.map(obj => cx.console.format(obj));
                 
-                if(typeof(msg.buffer) === 'undefined') {
-                    msg.buffer = [];
-                }
-                msg.buffer = msg.buffer.concat(buffer);
-                    
-                if(msg.buffer.length > 0) {
-                    if(!cx.console.flushTimeout) {
-                        if(cx.console.maxLines >= 0) { 
-                            cx.console.flushTimeout = setTimeout(function() {
-                                cx.console.maxLines--;
-                                cx.console.flushTimeout = undefined; 
-                                cx.console.flush();
-                            }, context.config.bot.floodProtection);  
+                    if(typeof(msg.buffer) === 'undefined') {
+                        msg.buffer = [];
+                    }
+                    msg.buffer = msg.buffer.concat(buffer);
+                        
+                    if(msg.buffer.length > 0) {
+                        if(!cx.console.flushTimeout) {
+                            if(cx.console.maxLines >= 0) { 
+                                cx.console.flushTimeout = setTimeout(function() {
+                                    cx.console.maxLines--;
+                                    cx.console.flushTimeout = undefined; 
+                                    cx.console.flush();
+                                }, context.config.bot.floodProtection);  
+                            }
                         }
                     }
+
+
+                } else {
+                    throw new Error('Flooding detected!');
                 }
+
+                
                 
             };
-            if(!cx.push) {
-                cx.push = function(obj, more) {
-                    
-                    var args = [].slice.call(arguments);
-                    if(args.length == 1) {
-                        if(Array.isArray(args[0])) {
-                            args = args[0];                            
-                        }
-                    } else if (!args.length) {
-                        throw new TypeError("Missing arguments");
+            
+            cx.push = function(obj, more) {
+                
+                var args = [].slice.call(arguments);
+                if(args.length == 1) {
+                    if(Array.isArray(args[0])) {
+                        args = args[0];                            
                     }
+                } else if (!args.length) {
+                    throw new TypeError("Missing arguments");
+                }
+                
+                if(!Array.isArray(cx.stack)) {
+                    cx.stack = [];
+                }
+                
+                cx.stack.push(args);
+                cx.__ = args;
+                
+                var res = "";
+                args.forEach(obj => {
+                    res += cx.console.format(obj) 
+                    //util.inspect(obj, {showHidden: false, depth: 1, colors: false});
+                    // cx.console.logn(2)(obj);
                     
-                    if(!Array.isArray(cx.stack)) {
-                        cx.stack = [];
-                    }
-                    
-                    cx.stack.push(args);
-                    cx.__ = args;
-                    
-                    var res = "";
-                    args.forEach(obj => {
-                        res += util.inspect(obj, {showHidden: false, depth: 1, colors: false});
-                        // cx.console.logn(2)(obj);
-                        
-                    });
-                               
-                    if(cx.stack.length) {
-                        var pos = cx.stack.length-1;
-                        res = "stack[" + pos + "] <-//-- \r\n" + res;
-                    }
-                    cx.console.log(res);
-                    return res;
-                };    
-            }
+                });
+                            
+                if(cx.stack.length) {
+                    var pos = cx.stack.length-1;
+                    res = "stack[" + pos + "] <-//-- \r\n" + res;
+                }
+                cx.console.log(res);
+                return res;
+            };    
+            
             
             //*
             // Eval Command
@@ -330,6 +341,7 @@ module.exports = function REPLContext(repl) {
     context.es5 = require('es5-shim');
     context.es6 = require('es6-shim');
     context.es7 = require('es7-shim');
+    context.EventEmitter = require('events').EventEmitter;
     context.qs = require('querystring');
     context.vm = require('vm');
     context.net = require('net');
@@ -468,7 +480,8 @@ module.exports = function REPLContext(repl) {
             sleep: cx.sleep,
             str: cx.str,
             stack: cx.stack,
-            images: cx.images
+            images: cx.images,
+            EventEmitter: cx.EventEmitter
             
         }
     } (context);
