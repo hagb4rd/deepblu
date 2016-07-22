@@ -19,20 +19,12 @@ var logdb = require("./logdb");
 var regeneratorRuntime = require("regenerator-runtime");
 var config = require("./config");
 
-/*
-const IRCBOT_MAX_LINES = 4;
-const IRCBOT_MAX_CHARS = 760;
-const IRCBOT_SPLIT_LINE = 400;
-const IRCBOT_INSPECT_DEPTH = 2;
-const IRCBOT_FLOODPROTECTION_DELAY = 400;
-const IRCBOT_EXECUTION_TIMEOUT = 12000;
-/* */
 
 //SLATE-IRC plugin
 var evalJS = function(context, transpile) {
     return function (irc) {
         irc.on('command', function(msg) {
-            console.log('irc.on("command")','\r\n-------------------------\r\n', util.inspect(msg, {depth: 1, showHidden: false, colors: false}));
+            console.log('irc.on("command")','\r\n-------------------------\r\n', util.inspect(msg, {depth: context.config.inspect.depth, showHidden: context.config.inspect.showHidden, colors: context.config.inspect.colors}));
             
             
             //var temp = extend(true, context, GLOBAL);
@@ -237,7 +229,7 @@ var evalJS = function(context, transpile) {
                 
             };
             
-            cx.push = function(obj, more) {
+            cx.push = function() {
                 
                 var args = [].slice.call(arguments);
                 if(args.length == 1) {
@@ -265,10 +257,10 @@ var evalJS = function(context, transpile) {
                             
                 if(cx.stack.length) {
                     var pos = cx.stack.length-1;
-                    res = "stack[" + pos + "] <-//-- \r\n" + res;
+                    res = " stack[" + pos + "] <-//-- \r\n" + res ;
                 }
                 cx.console.log(res);
-                return res;
+                //return res;
             };    
             
             
