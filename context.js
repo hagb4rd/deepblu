@@ -18,6 +18,7 @@ var gist = require("./lib/gist");
 var logdb = require("./logdb");
 var regeneratorRuntime = require("regenerator-runtime");
 var config = require("./config");
+var colors = require('irc-colors');
 
 
 //SLATE-IRC plugin
@@ -341,6 +342,10 @@ module.exports = function REPLContext(repl) {
     context.Promise = require('bluebird');
     context.lib = require('./lib/functions');
     context.str = require('./lib/string');
+    context.colors = require('irc-colors');
+    context.ansi = require('ansi-escape-sequences');
+    context.chalk = require('chalk');
+    context.colors.help = "https://www.npmjs.com/package/irc-colors";
     context.cheerio = require('cheerio');
     context._ = require('underscore');
     context.moment = require('moment');
@@ -454,6 +459,9 @@ module.exports = function REPLContext(repl) {
                 nextTick: process.nextTick
             },    
             util: cx.util,
+            colors: cx.colors,
+            chalk: cx.chalk,
+            ansi: cx.ansi,
             rp: cx.rp,
             request: cx.rp,
             google: cx.google,

@@ -13,7 +13,7 @@ module.exports = {
   inspect: {
     depth: 1,
     colors: true,
-    showHidden: true
+    showHidden: false
   },
   BABELIFY: true,
   IRCBOT_MAX_LINES: 4,

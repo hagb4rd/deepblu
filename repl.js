@@ -13,8 +13,9 @@ var extend = require('extend');
 var lib = require('./lib/functions');
 var google = require('./lib/google');
 //repl context module
-var REPLContext = require('./context');
 var config = require('./config');
+var REPLContext = require('./context');
+
 
 
 // REPL Options
@@ -59,7 +60,7 @@ replServer = net.createServer(function(socket) {
         //crepl.displayPrompt();
         if((result instanceof Promise) !== true) 
         {
-            return result;
+            return "\r\n" + result + "\r\n" + repl.prompt;
         }
     }
 
@@ -267,5 +268,5 @@ module.exports = repl;
 
 //Catch uncaught errors
 process.on('uncaught', function(e) {
-    console.log(util.inspect(e,{showHidden: true, depth:null, color: false}));;
+    console.log(util.inspect(e,{showHidden: true, depth:null, color: true}));;
 });

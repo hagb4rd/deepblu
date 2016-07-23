@@ -52,7 +52,7 @@ function Bot(nick, user, pass, host, port) {
             port: self.port
         };
         self.stream = tls.connect(tlsOptions, () => {
-            console.log('Socket conntected', util.inspect(self.stream, { showHidden: false, depth: 0, colors: false }));
+            console.log('Socket conntected', util.inspect(self.stream, { showHidden: false, depth: 0, colors: true }));
         })
     } else {
         self.stream = net.connect({ port: self.port, host: self.host });
